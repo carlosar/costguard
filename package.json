@@ -20,7 +20,7 @@
   "icon": "icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/soarone/costguard"
+    "url": "https://github.com/carlosar/costguard"
   },
   "main": "./out/extension.js",
   "contributes": {
