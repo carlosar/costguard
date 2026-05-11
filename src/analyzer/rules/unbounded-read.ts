@@ -19,6 +19,12 @@ function chainContainsLimit(callText: string): boolean {
   return /\.limit\s*\(/.test(callText) || /\blimit\s*\(/.test(callText);
 }
 
+// .count().get() and .aggregate().get() are server-side aggregations — they
+// never transfer documents and cost one read regardless of collection size.
+function isAggregateQuery(callText: string): boolean {
+  return /\.count\s*\(/.test(callText) || /\.aggregate\s*\(/.test(callText);
+}
+
 export const unboundedReadRule: Rule = {
   id: 'FCG002',
 
@@ -45,6 +51,7 @@ export const unboundedReadRule: Rule = {
       ) || /\.collection\s*\(/.test(fullChain) || fullChain.includes('collection(');
 
       if (!involvesCollection) return;
+      if (isAggregateQuery(fullChain)) return;
       if (chainContainsLimit(fullChain)) return;
 
       // Also skip single-document reads (doc() before get())

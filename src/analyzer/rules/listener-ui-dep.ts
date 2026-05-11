@@ -28,7 +28,22 @@ const UI_STATE_PATTERNS = [
   /Modal$/,            // confirmModal
 ];
 
+// Variables that carry auth/workspace/entity identity — re-subscribing when
+// these change is intentional (different workspace = different data).
+// activeWorkspaceOwnerId, currentUserId, selectedOrgId, etc.
+const IDENTITY_PATTERNS = [
+  /WorkspaceId$/i,
+  /OwnerId$/i,
+  /UserId$/i,
+  /OrgId$/i,
+  /ProjectId$/i,
+  /TeamId$/i,
+  /AccountId$/i,
+  /TenantId$/i,
+];
+
 function looksLikeUiState(name: string): boolean {
+  if (IDENTITY_PATTERNS.some(p => p.test(name))) return false;
   return UI_STATE_PATTERNS.some(p => p.test(name));
 }
 
