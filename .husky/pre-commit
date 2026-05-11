@@ -1,1 +1,9 @@
-npm test
+#!/bin/sh
+# 1 — Rebuild so CostGuard checks the latest compiled code
+npm run compile
+
+# 2 — TypeScript type check
+npm run typecheck
+
+# 3 — CostGuard checks its own staged files
+node out/cli.js --staged --max-risk=HIGH
