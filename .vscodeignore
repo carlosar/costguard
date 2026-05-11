@@ -1,0 +1,10 @@
+.vscode/**
+src/**
+.gitignore
+tsconfig.json
+esbuild.config.js
+**/*.map
+**/*.ts
+!out/**
+node_modules/**
+icon.png.png

@@ -1,0 +1,120 @@
+name: CostGuard
+
+on:
+  pull_request:
+    branches: [main, master]
+    paths:
+      - '**/*.ts'
+      - '**/*.tsx'
+      - '**/*.js'
+      - '**/*.jsx'
+
+jobs:
+  analyze:
+    name: Firebase Cost Risk Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: firebase-cost-guard/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: firebase-cost-guard
+
+      - name: Compile
+        run: npm run compile
+        working-directory: firebase-cost-guard
+
+      - name: Run CostGuard on src/
+        id: scan
+        # Always exit 0 here so we can post the comment even on failure
+        run: node firebase-cost-guard/out/cli.js src/ --json > costguard-report.json 2>&1 || true
+
+      - name: Post PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            let report;
+            try {
+              report = JSON.parse(fs.readFileSync('costguard-report.json', 'utf8'));
+            } catch {
+              console.log('CostGuard: could not parse report, skipping comment.');
+              return;
+            }
+
+            const { results, blocked } = report;
+
+            // ── All clear ──────────────────────────────────────────────────
+            if (!results || results.length === 0) {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo:  context.repo.repo,
+                body:  '## ✅ CostGuard\n\nNo Firebase cost risks detected in changed files.',
+              });
+              return;
+            }
+
+            // ── Risk table ─────────────────────────────────────────────────
+            const riskIcon = (level) =>
+              level === 'HIGH' ? '🔴 HIGH' : level === 'MEDIUM' ? '🟡 MEDIUM' : '🟢 LOW';
+
+            const scoreIcon = (n) => n >= 50 ? '🔴' : n >= 25 ? '🟡' : '🟢';
+
+            let table =
+              '| File | Score | Cost | Scalability | Memory Leak | Violations |\n' +
+              '|---|---|---|---|---|---|\n';
+
+            for (const r of results) {
+              table +=
+                `| \`${r.file}\` ` +
+                `| ${scoreIcon(r.score.overall)} ${r.score.overall}/100 ` +
+                `| ${riskIcon(r.score.costRisk)} ` +
+                `| ${riskIcon(r.score.scalabilityRisk)} ` +
+                `| ${riskIcon(r.score.memoryLeakRisk)} ` +
+                `| ${r.violations.length} |\n`;
+            }
+
+            // ── Violation details (collapsed) ──────────────────────────────
+            let details = '';
+            for (const r of results) {
+              details += `\n### \`${r.file}\`\n`;
+              for (const v of r.violations) {
+                const icon = v.severity === 'error' ? '❌' : '⚠️';
+                details += `- ${icon} **Line ${v.line}** \`[${v.code}]\` — ${v.message}\n`;
+              }
+            }
+
+            const totalViolations = results.reduce((n, r) => n + r.violations.length, 0);
+            const status = blocked
+              ? `❌ **${totalViolations} HIGH risk violation${totalViolations !== 1 ? 's' : ''} detected — review required before merging**`
+              : `⚠️ **${totalViolations} warning${totalViolations !== 1 ? 's' : ''} found** (below blocking threshold)`;
+
+            const body =
+              `## CostGuard Report\n\n` +
+              `${status}\n\n` +
+              `${table}\n` +
+              `<details>\n<summary>Violation details</summary>\n\n${details}\n</details>`;
+
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+              body,
+            });
+
+            // Fail the check if HIGH risk violations were found
+            if (blocked) {
+              core.setFailed(`CostGuard: ${totalViolations} HIGH risk violation(s) found. Fix before merging.`);
+            }
