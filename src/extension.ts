@@ -3,6 +3,7 @@ import { analyzeFile } from './analyzer';
 import { computeRiskScore } from './analyzer/scorer';
 import { RiskScore, RiskLevel } from './analyzer/types';
 import { runSetupWizard } from './setup';
+import { generateReport } from './reporter';
 
 const SUPPORTED = new Set(['typescript', 'typescriptreact', 'javascript', 'javascriptreact']);
 const SUPPORTED_SELECTOR = [
@@ -146,10 +147,32 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.languages.registerCodeLensProvider(SUPPORTED_SELECTOR, codeLensProvider)
   );
 
-  // Setup wizard command — available any time from the command palette
+  // Setup wizard command
   context.subscriptions.push(
     vscode.commands.registerCommand('costGuard.setup', () => {
       runSetupWizard(context, false);
+    })
+  );
+
+  // Generate markdown report command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('costGuard.generateReport', async () => {
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!workspaceRoot) {
+        vscode.window.showWarningMessage('CostGuard: Open a project folder first.');
+        return;
+      }
+      await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: 'CostGuard: Scanning and generating report…' },
+        async () => {
+          const reportPath = generateReport(workspaceRoot);
+          const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(reportPath));
+          await vscode.window.showTextDocument(doc);
+          vscode.window.showInformationMessage(
+            `CostGuard: Report saved to costguard/${require('path').basename(reportPath)}`
+          );
+        }
+      );
     })
   );
 

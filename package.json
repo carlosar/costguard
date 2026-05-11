@@ -2,7 +2,7 @@
   "name": "costguard",
   "displayName": "CostGuard",
   "description": "Detects expensive code patterns — runaway Firebase reads, missing real-time listener cleanup, polling abuse, and React render loops — before they hit production.",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "publisher": "soarone",
   "engines": {
     "vscode": "^1.85.0"
@@ -32,6 +32,10 @@
       {
         "command": "costGuard.setup",
         "title": "CostGuard: Setup"
+      },
+      {
+        "command": "costGuard.generateReport",
+        "title": "CostGuard: Generate Report"
       }
     ],
     "configuration": {
