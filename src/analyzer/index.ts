@@ -8,6 +8,8 @@ import { intervalCleanupRule } from './rules/interval-cleanup';
 import { eventListenerCleanupRule } from './rules/event-listener-cleanup';
 import { fetchInLoopRule } from './rules/fetch-in-loop';
 import { readInRenderRule } from './rules/read-in-render';
+import { compoundRenderLoopRule } from './rules/compound-render-loop';
+import { highFreqHandlerRule } from './rules/high-freq-handler';
 
 const ALL_RULES = [
   unstableDepsRule,           // FCG001: unstable useEffect deps (object/array/fn/call)
@@ -19,6 +21,8 @@ const ALL_RULES = [
   eventListenerCleanupRule,   // FCG007: addEventListener without removeEventListener
   fetchInLoopRule,            // FCG008: fetch/axios inside a loop (N+1 HTTP requests)
   readInRenderRule,           // FCG009: getDoc/getDocs in component body (re-fetches every render)
+  compoundRenderLoopRule,     // FCG010: unstable dep + expensive op in same effect (the $95 pattern)
+  highFreqHandlerRule,        // FCG011: expensive op in scroll/mousemove/resize/keydown handler
 ];
 
 export function analyzeFile(sourceText: string, filePath: string): RuleDiagnostic[] {
