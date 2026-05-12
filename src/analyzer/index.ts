@@ -10,6 +10,10 @@ import { fetchInLoopRule } from './rules/fetch-in-loop';
 import { readInRenderRule } from './rules/read-in-render';
 import { compoundRenderLoopRule } from './rules/compound-render-loop';
 import { highFreqHandlerRule } from './rules/high-freq-handler';
+import { writeInLoopRule } from './rules/write-in-loop';
+import { pollingIntervalRule } from './rules/polling-interval';
+import { clientSideFilterRule } from './rules/client-side-filter';
+import { fieldValueAtomicRule } from './rules/fieldvalue-atomic';
 
 const ALL_RULES = [
   unstableDepsRule,           // FCG001: unstable useEffect deps (object/array/fn/call)
@@ -23,6 +27,10 @@ const ALL_RULES = [
   readInRenderRule,           // FCG009: getDoc/getDocs in component body (re-fetches every render)
   compoundRenderLoopRule,     // FCG010: unstable dep + expensive op in same effect (the $95 pattern)
   highFreqHandlerRule,        // FCG011: expensive op in scroll/mousemove/resize/keydown handler
+  writeInLoopRule,            // FCG012: addDoc/setDoc/updateDoc/deleteDoc inside loops (unbatched writes)
+  pollingIntervalRule,        // FCG013: setInterval + Firestore read (use onSnapshot instead)
+  clientSideFilterRule,       // FCG014: getDocs() result filtered client-side (.filter/.find on .docs)
+  fieldValueAtomicRule,       // FCG015: array push/counter += written back (use arrayUnion/increment)
 ];
 
 export function analyzeFile(sourceText: string, filePath: string): RuleDiagnostic[] {
