@@ -14,6 +14,7 @@ import { writeInLoopRule } from './rules/write-in-loop';
 import { pollingIntervalRule } from './rules/polling-interval';
 import { clientSideFilterRule } from './rules/client-side-filter';
 import { fieldValueAtomicRule } from './rules/fieldvalue-atomic';
+import { unusedCloudFunctionRule } from './rules/unused-cloud-function';
 
 const ALL_RULES = [
   unstableDepsRule,           // FCG001: unstable useEffect deps (object/array/fn/call)
@@ -31,6 +32,7 @@ const ALL_RULES = [
   pollingIntervalRule,        // FCG013: setInterval + Firestore read (use onSnapshot instead)
   clientSideFilterRule,       // FCG014: getDocs() result filtered client-side (.filter/.find on .docs)
   fieldValueAtomicRule,       // FCG015: array push/counter += written back (use arrayUnion/increment)
+  unusedCloudFunctionRule,    // FCG016: Cloud Function defined but not exported (dead in bundle)
 ];
 
 export function analyzeFile(sourceText: string, filePath: string): RuleDiagnostic[] {
