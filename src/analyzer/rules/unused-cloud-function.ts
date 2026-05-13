@@ -39,7 +39,8 @@ const V2_FACTORIES = new Set([
 ]);
 
 // v1 compat: functions.https.onRequest, functions.firestore.document(...).onCreate, etc.
-const V1_FACTORY_RE = /\bfunctions\s*\.\s*\w+/;
+// Requires a known Firebase Functions namespace so string literals like 'functions.ts' don't match.
+const V1_FACTORY_RE = /^functions\s*\.\s*(https|firestore|storage|pubsub|auth|database|remoteConfig|analytics|tasks)\s*\./;
 
 function isCloudFunctionFactory(initText: string): boolean {
   // v2: top-level factory call
