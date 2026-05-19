@@ -81,12 +81,13 @@ export const writeInLoopRule: Rule = {
       });
       if (inBatchContext) return;
 
-      // Skip if inside Promise.all([...]) — batching intent
-      const inPromiseAll = ancestors.some(a => {
+      // Skip if inside any Promise fanout — writes run in parallel, not serially
+      const FANOUT_CALLS = new Set(['Promise.all', 'Promise.allSettled', 'Promise.race', 'Promise.any']);
+      const inPromiseFanout = ancestors.some(a => {
         if (a.getKind() !== SyntaxKind.CallExpression) return false;
-        return (a as typeof call).getExpression().getText() === 'Promise.all';
+        return FANOUT_CALLS.has((a as typeof call).getExpression().getText());
       });
-      if (inPromiseAll) return;
+      if (inPromiseFanout) return;
 
       const inDirectLoop = ancestors.some(a => LOOP_KINDS.has(a.getKind() as SyntaxKind));
 

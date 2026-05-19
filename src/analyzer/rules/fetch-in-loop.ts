@@ -83,14 +83,21 @@ export const fetchInLoopRule: Rule = {
       });
       if (inPromiseFanout) return;
 
-      // Collect-then-fanout: axios inside .map() and the enclosing function also has a Promise fanout
-      const inMapCallback = ancestors.some(ancestor => {
-        if (ancestor.getKind() !== SyntaxKind.CallExpression) return false;
-        const callee = (ancestor as typeof call).getExpression();
-        if (callee.getKind() !== SyntaxKind.PropertyAccessExpression) return false;
-        return callee.asKind(SyntaxKind.PropertyAccessExpression)?.getName() === 'map';
-      });
-      if (inMapCallback) {
+      // Collect-then-fanout: call not awaited inside loop — promise is being collected
+      // for a later Promise.allSettled/all (do...while push pattern, forEach push, etc.).
+      // Walk up ancestors to the loop boundary; if no AwaitExpression is found, the
+      // call's promise is being stored rather than sequentially awaited.
+      let isDirectlyAwaited = false;
+      for (const a of ancestors) {
+        if (a.getKind() === SyntaxKind.AwaitExpression) { isDirectlyAwaited = true; break; }
+        if (
+          LOOP_KINDS.has(a.getKind() as SyntaxKind) ||
+          a.getKind() === SyntaxKind.ArrowFunction        ||
+          a.getKind() === SyntaxKind.FunctionDeclaration  ||
+          a.getKind() === SyntaxKind.FunctionExpression
+        ) break;
+      }
+      if (!isDirectlyAwaited) {
         const enclosingFn =
           call.getFirstAncestorByKind(SyntaxKind.FunctionDeclaration) ||
           call.getFirstAncestorByKind(SyntaxKind.ArrowFunction)       ||

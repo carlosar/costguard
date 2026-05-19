@@ -88,6 +88,10 @@ export const fieldValueAtomicRule: Rule = {
       ) {
         const argText = call.getArguments().map(a => a.getText()).join(', ');
         if (ALREADY_ATOMIC_RE.test(argText)) return;
+        // Require write args to reference the same variable that was mutated — prevents
+        // false positives where push() is on a local/helper array unrelated to the write
+        const mutatedVars = [...scopeText.matchAll(/\b(\w+)\.(?:push|concat|splice)\s*\(/g)].map(m => m[1]);
+        if (!mutatedVars.some(v => argText.includes(v))) return;
 
         const pos = call.getExpression().getStart();
         const { line, column } = sf.getLineAndColumnAtPos(pos);
@@ -110,6 +114,9 @@ export const fieldValueAtomicRule: Rule = {
       ) {
         const argText = call.getArguments().map(a => a.getText()).join(', ');
         if (ALREADY_ATOMIC_RE.test(argText)) return;
+        // Require write args to contain an incremented/decremented expression — prevents
+        // false positives where ++ is on a local counter unrelated to the Firestore write
+        if (!/\b\w+\s*[+\-]\s*1\b|\b\w+(?:\+\+|--)/.test(argText)) return;
 
         const pos = call.getExpression().getStart();
         const { line, column } = sf.getLineAndColumnAtPos(pos);
