@@ -214,14 +214,12 @@ export function activate(context: vscode.ExtensionContext): void {
   let setupComplete  = isNewVersion ? false : context.globalState.get<boolean>('costguard.setupComplete',  false);
   let setupDismissed = isNewVersion ? false : context.globalState.get<boolean>('costguard.setupDismissed', false);
 
-  // If setup was stored as complete, verify protection files still exist.
-  // VS Code persists globalState across reinstalls of the same version, so
-  // a fresh reinstall would otherwise silently skip the wizard.
-  if (setupComplete && workspaceRoot && !hasAnyProtection(workspaceRoot)) {
-    setupComplete  = false;
-    setupDismissed = false;
-    context.globalState.update('costguard.setupComplete',  false);
-    context.globalState.update('costguard.setupDismissed', false);
+  // VS Code persists globalState through same-version reinstalls, so stale
+  // setupComplete/setupDismissed flags would silently suppress the wizard.
+  // Reset whichever flags are set whenever no protection layer is installed.
+  if (workspaceRoot && !hasAnyProtection(workspaceRoot)) {
+    if (setupComplete)  { setupComplete  = false; context.globalState.update('costguard.setupComplete',  false); }
+    if (setupDismissed) { setupDismissed = false; context.globalState.update('costguard.setupDismissed', false); }
   }
 
   if (!setupComplete && !setupDismissed) {
@@ -239,8 +237,12 @@ export function activate(context: vscode.ExtensionContext): void {
     if (vscode.workspace.workspaceFolders?.length) {
       setTimeout(showBanner, 1500);
     } else {
+      // No workspace at activation — defer until one is open so we can check
+      // whether protection files exist before deciding to show the banner.
       const onOpen = vscode.workspace.onDidOpenTextDocument(() => {
         onOpen.dispose();
+        const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (wsRoot && hasAnyProtection(wsRoot)) return; // protection in place, skip
         showBanner();
       });
       context.subscriptions.push(onOpen);
