@@ -72,16 +72,32 @@ export const fetchInLoopRule: Rule = {
 
       if (!inDirectLoop && !inArrayLoop) return;
 
-      // Skip if the loop feeds into a Promise fan-out — calls run in parallel, not serially
+      // Skip if the loop feeds into a Promise fan-out — calls run in parallel, not serially.
+      // Handles both inline: Promise.all(items.map(i => axios.post(...)))
+      // and collect-then-fanout: const p = items.map(...); await Promise.allSettled(p)
+      const FANOUT_CALLS = ['Promise.all', 'Promise.allSettled', 'Promise.race', 'Promise.any'];
+
       const inPromiseFanout = ancestors.some(a => {
         if (a.getKind() !== SyntaxKind.CallExpression) return false;
-        const callee = (a as typeof call).getExpression().getText();
-        return callee === 'Promise.all' ||
-               callee === 'Promise.allSettled' ||
-               callee === 'Promise.race' ||
-               callee === 'Promise.any';
+        return FANOUT_CALLS.includes((a as typeof call).getExpression().getText());
       });
       if (inPromiseFanout) return;
+
+      // Collect-then-fanout: axios inside .map() and the enclosing function also has a Promise fanout
+      const inMapCallback = ancestors.some(ancestor => {
+        if (ancestor.getKind() !== SyntaxKind.CallExpression) return false;
+        const callee = (ancestor as typeof call).getExpression();
+        if (callee.getKind() !== SyntaxKind.PropertyAccessExpression) return false;
+        return callee.asKind(SyntaxKind.PropertyAccessExpression)?.getName() === 'map';
+      });
+      if (inMapCallback) {
+        const enclosingFn =
+          call.getFirstAncestorByKind(SyntaxKind.FunctionDeclaration) ||
+          call.getFirstAncestorByKind(SyntaxKind.ArrowFunction)       ||
+          call.getFirstAncestorByKind(SyntaxKind.FunctionExpression);
+        const scopeText = enclosingFn?.getText() ?? '';
+        if (FANOUT_CALLS.some(f => scopeText.includes(f + '('))) return;
+      }
 
       const pos = call.getExpression().getStart();
       const { line, column } = sf.getLineAndColumnAtPos(pos);

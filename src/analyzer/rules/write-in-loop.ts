@@ -31,18 +31,16 @@ const ARRAY_LOOP_METHODS = new Set([
   'forEach', 'map', 'filter', 'reduce', 'flatMap', 'some', 'every', 'find', 'findIndex',
 ]);
 
-// For compat names, only flag when the RECEIVER looks like a Firestore reference.
-// We check exprText (e.g. "db.collection('x').doc(id).set"), not call.getText()
-// which includes arguments — that caused false positives on batch.set(docRef, …)
-// because the docRef arg contained "collection(" / "doc(", making the batch op
-// look like an individual unbatched write.
+// For compat names, only flag when the RECEIVER looks like a Firestore reference
+// chain (contains collection() or doc() calls). We deliberately omit a bare
+// *Ref variable-name check because it misidentifies WriteBatch variables named
+// batchRef and Map/cache variables named cacheRef.
 function isFirestoreCompatWrite(exprText: string, methodName: string): boolean {
   if (!COMPAT_WRITES.has(methodName)) return false;
   const receiver = exprText.slice(0, exprText.lastIndexOf('.'));
   return (
     /\bcollection\s*\(/.test(receiver) ||
-    /\bdoc\s*\(/.test(receiver) ||
-    /Ref\b/.test(receiver)
+    /\bdoc\s*\(/.test(receiver)
   );
 }
 
@@ -76,8 +74,11 @@ export const writeInLoopRule: Rule = {
 
       const ancestors = call.getAncestors();
 
-      // Skip if already inside a writeBatch context
-      const inBatchContext = ancestors.some(a => a.getText().includes('writeBatch'));
+      // Skip if already inside a writeBatch / Admin SDK batch context
+      const inBatchContext = ancestors.some(a => {
+        const t = a.getText();
+        return t.includes('writeBatch') || t.includes('.batch(');
+      });
       if (inBatchContext) return;
 
       // Skip if inside Promise.all([...]) — batching intent

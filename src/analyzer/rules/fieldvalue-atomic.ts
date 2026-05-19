@@ -56,9 +56,9 @@ export const fieldValueAtomicRule: Rule = {
       // Check only exprText (receiver + method, no args) to avoid false positives
       // on Map.prototype.set(), plain-object helpers, etc. that share the method name.
       const isCompatWrite  = (methodName === 'set' || methodName === 'update') && (
-        /Ref\.(set|update)$/.test(exprText) ||     // fooRef.set / fooRef.update
         /\bcollection\s*\(/.test(exprText) ||       // db.collection(…)…set
         /\bdoc\s*\(/.test(exprText)                 // db.collection(…).doc(…).set
+        // Note: /Ref\.(set|update)$/ removed — too broad; flags Map/cache variables named *Ref
       );
 
       if (!isModularWrite && !isCompatWrite) return;
