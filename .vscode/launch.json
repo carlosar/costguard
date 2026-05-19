@@ -8,7 +8,7 @@
       "args": [
         "--extensionDevelopmentPath=${workspaceFolder}",
         // Opens your SoarOne project in the Extension Development Host automatically
-        "${workspaceFolder}/../soarone-ar-mvp/hosting/client/src"
+        "${workspaceFolder}/../soarone-ar-mvp/functions"
       ],
       "outFiles": ["${workspaceFolder}/out/**/*.js"],
       "preLaunchTask": "${defaultBuildTask}"

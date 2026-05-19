@@ -177,6 +177,22 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
+  // Dev/testing command: wipe setup state so the onboarding banner re-appears
+  context.subscriptions.push(
+    vscode.commands.registerCommand('costGuard.resetSetup', async () => {
+      await context.globalState.update('costguard.setupComplete',  false);
+      await context.globalState.update('costguard.setupDismissed', false);
+      vscode.window.showInformationMessage(
+        'CostGuard installed — configure your protection layers (pre-commit, GitHub Actions, deploy gate)',
+        'Set Up Now',
+        'Later',
+      ).then(choice => {
+        if (choice === 'Set Up Now') runSetupWizard(context, true);
+        if (choice === 'Later')      context.globalState.update('costguard.setupDismissed', true);
+      });
+    })
+  );
+
   // Generate markdown report command
   context.subscriptions.push(
     vscode.commands.registerCommand('costGuard.generateReport', async () => {
@@ -217,13 +233,18 @@ export function activate(context: vscode.ExtensionContext): void {
   // VS Code persists globalState through same-version reinstalls, so stale
   // setupComplete/setupDismissed flags would silently suppress the wizard.
   // Reset whichever flags are set whenever no protection layer is installed.
-  if (workspaceRoot && !hasAnyProtection(workspaceRoot)) {
+  const protection = workspaceRoot ? hasAnyProtection(workspaceRoot) : false;
+  console.log(`[CostGuard] workspaceRoot=${workspaceRoot} protection=${protection} setupComplete=${setupComplete} setupDismissed=${setupDismissed}`);
+  if (!workspaceRoot || !protection) {
     if (setupComplete)  { setupComplete  = false; context.globalState.update('costguard.setupComplete',  false); }
     if (setupDismissed) { setupDismissed = false; context.globalState.update('costguard.setupDismissed', false); }
   }
 
+  console.log(`[CostGuard] after reset: setupComplete=${setupComplete} setupDismissed=${setupDismissed} → showBanner=${!setupComplete && !setupDismissed}`);
+
   if (!setupComplete && !setupDismissed) {
     const showBanner = () => {
+      console.log('[CostGuard] showBanner firing');
       vscode.window.showInformationMessage(
         'CostGuard installed — configure your protection layers (pre-commit, GitHub Actions, deploy gate)',
         'Set Up Now',
@@ -235,7 +256,7 @@ export function activate(context: vscode.ExtensionContext): void {
     };
 
     if (vscode.workspace.workspaceFolders?.length) {
-      setTimeout(showBanner, 1500);
+      setTimeout(showBanner, 3000);
     } else {
       // No workspace at activation — defer until one is open so we can check
       // whether protection files exist before deciding to show the banner.

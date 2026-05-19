@@ -36,6 +36,10 @@
       {
         "command": "costGuard.generateReport",
         "title": "CostGuard: Generate Report"
+      },
+      {
+        "command": "costGuard.resetSetup",
+        "title": "CostGuard: Reset Setup State"
       }
     ],
     "configuration": {
@@ -57,7 +61,7 @@
     "typecheck": "tsc --noEmit -p ./",
     "watch": "node esbuild.config.js --watch",
     "vscode:prepublish": "node esbuild.config.js --minify",
-    "package": "vsce package",
+    "package": "vsce package --allow-missing-repository",
     "publish": "vsce publish",
     "setup-hooks": "node scripts/setup-hooks.js",
     "predeploy": "node out/cli.js src/ --max-risk=MEDIUM",
@@ -67,6 +71,7 @@
     "@commitlint/cli": "^21.0.0",
     "@commitlint/config-conventional": "^21.0.0",
     "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/exec": "^7.1.0",
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/github": "^12.0.8",
     "@types/node": "^20.0.0",
