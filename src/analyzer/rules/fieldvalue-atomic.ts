@@ -53,8 +53,13 @@ export const fieldValueAtomicRule: Rule = {
 
       // Only inspect write calls
       const isModularWrite = WRITE_CALLS.has(methodName);
-      const isCompatWrite  = (methodName === 'set' || methodName === 'update') &&
-                             (/Ref\s*\.(set|update)\s*\(/.test(exprText) || /\.(set|update)\s*\(/.test(call.getText()));
+      // Check only exprText (receiver + method, no args) to avoid false positives
+      // on Map.prototype.set(), plain-object helpers, etc. that share the method name.
+      const isCompatWrite  = (methodName === 'set' || methodName === 'update') && (
+        /Ref\.(set|update)$/.test(exprText) ||     // fooRef.set / fooRef.update
+        /\bcollection\s*\(/.test(exprText) ||       // db.collection(…)…set
+        /\bdoc\s*\(/.test(exprText)                 // db.collection(…).doc(…).set
+      );
 
       if (!isModularWrite && !isCompatWrite) return;
 

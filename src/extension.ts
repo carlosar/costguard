@@ -1,8 +1,10 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { analyzeFile } from './analyzer';
 import { computeRiskScore } from './analyzer/scorer';
 import { RiskScore, RiskLevel } from './analyzer/types';
-import { runSetupWizard } from './setup';
+import { runSetupWizard, findGitRoot } from './setup';
 import { generateReport } from './reporter';
 
 const SUPPORTED = new Set(['typescript', 'typescriptreact', 'javascript', 'javascriptreact']);
@@ -132,6 +134,27 @@ function updateStatusBar(doc: vscode.TextDocument | undefined): void {
   statusBarItem.show();
 }
 
+// ── Protection-layer detection ────────────────────────────────────────────────
+
+function hasAnyProtection(workspaceRoot: string): boolean {
+  if (fs.existsSync(path.join(workspaceRoot, '.github', 'workflows', 'costguard.yml'))) return true;
+  const gitRoot = findGitRoot(workspaceRoot);
+  if (gitRoot) {
+    const hookFile = path.join(gitRoot, '.git', 'hooks', 'pre-commit');
+    try {
+      if (fs.existsSync(hookFile) && fs.readFileSync(hookFile, 'utf8').includes('CostGuard')) return true;
+    } catch {}
+  }
+  const pkgFile = path.join(workspaceRoot, 'package.json');
+  if (fs.existsSync(pkgFile)) {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
+      if (pkg.scripts?.predeploy?.includes('costguard')) return true;
+    } catch {}
+  }
+  return false;
+}
+
 // ── Activation ────────────────────────────────────────────────────────────────
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -187,8 +210,19 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   // Derive wizard flags without relying on the async update above having resolved
-  const setupComplete  = isNewVersion ? false : context.globalState.get<boolean>('costguard.setupComplete',  false);
-  const setupDismissed = isNewVersion ? false : context.globalState.get<boolean>('costguard.setupDismissed', false);
+  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  let setupComplete  = isNewVersion ? false : context.globalState.get<boolean>('costguard.setupComplete',  false);
+  let setupDismissed = isNewVersion ? false : context.globalState.get<boolean>('costguard.setupDismissed', false);
+
+  // If setup was stored as complete, verify protection files still exist.
+  // VS Code persists globalState across reinstalls of the same version, so
+  // a fresh reinstall would otherwise silently skip the wizard.
+  if (setupComplete && workspaceRoot && !hasAnyProtection(workspaceRoot)) {
+    setupComplete  = false;
+    setupDismissed = false;
+    context.globalState.update('costguard.setupComplete',  false);
+    context.globalState.update('costguard.setupDismissed', false);
+  }
 
   if (!setupComplete && !setupDismissed) {
     const showBanner = () => {

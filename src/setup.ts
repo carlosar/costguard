@@ -16,7 +16,7 @@ function unixPath(p: string): string {
   return p.replace(/\\/g, '/');
 }
 
-function findGitRoot(dir: string): string | null {
+export function findGitRoot(dir: string): string | null {
   if (fs.existsSync(path.join(dir, '.git'))) return dir;
   const parent = path.dirname(dir);
   return parent === dir ? null : findGitRoot(parent);

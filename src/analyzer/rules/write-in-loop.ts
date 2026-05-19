@@ -31,13 +31,18 @@ const ARRAY_LOOP_METHODS = new Set([
   'forEach', 'map', 'filter', 'reduce', 'flatMap', 'some', 'every', 'find', 'findIndex',
 ]);
 
-// For compat names, only flag when the call chain looks like Firestore
-function isFirestoreCompatWrite(fullChain: string, methodName: string): boolean {
+// For compat names, only flag when the RECEIVER looks like a Firestore reference.
+// We check exprText (e.g. "db.collection('x').doc(id).set"), not call.getText()
+// which includes arguments — that caused false positives on batch.set(docRef, …)
+// because the docRef arg contained "collection(" / "doc(", making the batch op
+// look like an individual unbatched write.
+function isFirestoreCompatWrite(exprText: string, methodName: string): boolean {
   if (!COMPAT_WRITES.has(methodName)) return false;
+  const receiver = exprText.slice(0, exprText.lastIndexOf('.'));
   return (
-    /\bcollection\s*\(/.test(fullChain) ||
-    /\bdoc\s*\(/.test(fullChain) ||
-    /Ref\s*\.\s*(set|update|delete)\s*\(/.test(fullChain)
+    /\bcollection\s*\(/.test(receiver) ||
+    /\bdoc\s*\(/.test(receiver) ||
+    /Ref\b/.test(receiver)
   );
 }
 
@@ -64,10 +69,9 @@ export const writeInLoopRule: Rule = {
     sf.getDescendantsOfKind(SyntaxKind.CallExpression).forEach(call => {
       const exprText   = call.getExpression().getText();
       const methodName = exprText.split('.').pop() ?? '';
-      const fullChain  = call.getText();
 
       const isModular = MODULAR_WRITES.has(methodName);
-      const isCompat  = isFirestoreCompatWrite(fullChain, methodName);
+      const isCompat  = isFirestoreCompatWrite(exprText, methodName);
       if (!isModular && !isCompat) return;
 
       const ancestors = call.getAncestors();

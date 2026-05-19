@@ -72,6 +72,17 @@ export const fetchInLoopRule: Rule = {
 
       if (!inDirectLoop && !inArrayLoop) return;
 
+      // Skip if the loop feeds into a Promise fan-out — calls run in parallel, not serially
+      const inPromiseFanout = ancestors.some(a => {
+        if (a.getKind() !== SyntaxKind.CallExpression) return false;
+        const callee = (a as typeof call).getExpression().getText();
+        return callee === 'Promise.all' ||
+               callee === 'Promise.allSettled' ||
+               callee === 'Promise.race' ||
+               callee === 'Promise.any';
+      });
+      if (inPromiseFanout) return;
+
       const pos = call.getExpression().getStart();
       const { line, column } = sf.getLineAndColumnAtPos(pos);
 
