@@ -14,8 +14,26 @@
  * any utility — those wrappers are the correct fix.
  */
 
-import { Project, SyntaxKind } from 'ts-morph';
+import { Project, SyntaxKind, SourceFile } from 'ts-morph';
 import { Rule, RuleDiagnostic } from '../types';
+
+function findCallableNames(sf: SourceFile): Set<string> {
+  const names = new Set<string>();
+  sf.getDescendantsOfKind(SyntaxKind.VariableDeclaration).forEach(decl => {
+    const init = decl.getInitializer()?.getText() ?? '';
+    if (/^httpsCallable[\s(<]/.test(init)) names.add(decl.getName());
+  });
+  return names;
+}
+
+function matchExpensiveOp(bodyText: string, callableNames: Set<string>): string | null {
+  const m = EXPENSIVE_OP_RE.exec(bodyText);
+  if (m) return m[1];
+  for (const name of callableNames) {
+    if (bodyText.includes(name + '(')) return name;
+  }
+  return null;
+}
 
 const HIGH_FREQ_EVENTS = new Set([
   'scroll', 'mousemove', 'pointermove', 'touchmove',
@@ -38,7 +56,7 @@ export const highFreqHandlerRule: Rule = {
   id: 'FCG011',
 
   analyze(sourceText: string, filePath: string): RuleDiagnostic[] {
-    const hasExpensive = EXPENSIVE_OP_RE.test(sourceText);
+    const hasExpensive = EXPENSIVE_OP_RE.test(sourceText) || sourceText.includes('httpsCallable');
     if (!hasExpensive) return [];
 
     const project = new Project({
@@ -47,6 +65,7 @@ export const highFreqHandlerRule: Rule = {
       compilerOptions: { allowJs: true, jsx: 4 }
     });
     const sf = project.createSourceFile(filePath.replace(/\\/g, '/'), sourceText);
+    const callableNames = findCallableNames(sf);
     const diagnostics: RuleDiagnostic[] = [];
 
     // ── Pattern 1: element.addEventListener('scroll', fn) ────────────────────
@@ -73,34 +92,29 @@ export const highFreqHandlerRule: Rule = {
 
       // Resolve inline functions and named references
       let bodyText = handlerText;
-      if (
-        handlerArg.getKind() === SyntaxKind.Identifier
-      ) {
-        // Named handler — try to find its definition in the same file
-        const name = handlerText;
+      if (handlerArg.getKind() === SyntaxKind.Identifier) {
+        const declName = handlerText;
         const decl = sf.getDescendantsOfKind(SyntaxKind.VariableDeclaration)
-          .find(v => v.getName() === name);
+          .find(v => v.getName() === declName);
         bodyText = decl?.getInitializer()?.getText() ?? handlerText;
       }
 
-      if (!EXPENSIVE_OP_RE.test(bodyText)) return;
-
-      const opMatch = EXPENSIVE_OP_RE.exec(bodyText);
-      const op = opMatch?.[1] ?? 'an expensive operation';
+      const op = matchExpensiveOp(bodyText, callableNames);
+      if (!op) return;
 
       const pos = expr.getStart();
       const { line, column } = sf.getLineAndColumnAtPos(pos);
-      const name = expr.getText();
+      const exprName = expr.getText();
 
       diagnostics.push({
         message:
           `[FCG011] ${op}() inside a '${eventName}' handler fires on every ${eventName} event ` +
           `(up to hundreds of times/second) — no debounce or throttle detected. ` +
-          `This can generate thousands of billed reads per minute of user interaction. ` +
+          `This can generate thousands of billed operations per minute of user interaction. ` +
           `Fix: wrap the handler in debounce(handler, 300) or throttle(handler, 500).`,
         line: line - 1,
         startChar: column - 1,
-        endChar: column - 1 + name.length,
+        endChar: column - 1 + exprName.length,
         severity: 'error',
         code: 'FCG011'
       });
@@ -124,16 +138,14 @@ export const highFreqHandlerRule: Rule = {
       let bodyText = handlerText;
       const inner = initializer.getFirstChildByKind(SyntaxKind.Identifier);
       if (inner) {
-        const name = inner.getText();
+        const innerName = inner.getText();
         const decl = sf.getDescendantsOfKind(SyntaxKind.VariableDeclaration)
-          .find(v => v.getName() === name);
+          .find(v => v.getName() === innerName);
         bodyText = decl?.getInitializer()?.getText() ?? handlerText;
       }
 
-      if (!EXPENSIVE_OP_RE.test(bodyText)) return;
-
-      const opMatch = EXPENSIVE_OP_RE.exec(bodyText);
-      const op = opMatch?.[1] ?? 'an expensive operation';
+      const op = matchExpensiveOp(bodyText, callableNames);
+      if (!op) return;
 
       const eventLabel = attrName.replace(/^on/, '').toLowerCase();
 
@@ -143,7 +155,7 @@ export const highFreqHandlerRule: Rule = {
       diagnostics.push({
         message:
           `[FCG011] ${op}() wired to ${attrName} fires on every ${eventLabel} event ` +
-          `without debounce or throttle — can generate hundreds of billed reads per second. ` +
+          `without debounce or throttle — can generate hundreds of billed operations per second. ` +
           `Fix: wrap the handler in debounce(handler, 300) or throttle(handler, 500).`,
         line: line - 1,
         startChar: column - 1,

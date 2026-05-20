@@ -18,10 +18,19 @@
  * surface the compound risk explicitly at the useEffect level.
  */
 
-import { Project, SyntaxKind, Node } from 'ts-morph';
+import { Project, SyntaxKind, Node, SourceFile } from 'ts-morph';
 import { Rule, RuleDiagnostic } from '../types';
 
 const STABLE_WRAPPERS = new Set(['useMemo', 'useCallback', 'useRef', 'useState', 'useReducer']);
+
+function findCallableNames(sf: SourceFile): Set<string> {
+  const names = new Set<string>();
+  sf.getDescendantsOfKind(SyntaxKind.VariableDeclaration).forEach(decl => {
+    const init = decl.getInitializer()?.getText() ?? '';
+    if (/^httpsCallable[\s(<]/.test(init)) names.add(decl.getName());
+  });
+  return names;
+}
 
 // Operations whose presence in an effect body makes unstable deps dangerous
 const EXPENSIVE_OP_RE = /\b(getDoc|getDocs|onSnapshot|fetch|axios)\s*[.(]/;
@@ -60,6 +69,7 @@ export const compoundRenderLoopRule: Rule = {
       compilerOptions: { allowJs: true, jsx: 4 }
     });
     const sf = project.createSourceFile(filePath.replace(/\\/g, '/'), sourceText);
+    const callableNames = findCallableNames(sf);
     const diagnostics: RuleDiagnostic[] = [];
 
     sf.getDescendantsOfKind(SyntaxKind.CallExpression).forEach(call => {
@@ -72,9 +82,12 @@ export const compoundRenderLoopRule: Rule = {
       const depsArg  = args[1];
       if (depsArg.getKind() !== SyntaxKind.ArrayLiteralExpression) return;
 
-      // Does the effect body contain an expensive operation?
+      // Does the effect body contain an expensive operation or Cloud Function call?
       const bodyText = callback.getText();
-      if (!EXPENSIVE_OP_RE.test(bodyText)) return;
+      const callableMatch = callableNames.size > 0
+        ? [...callableNames].find(name => bodyText.includes(name + '('))
+        : undefined;
+      if (!EXPENSIVE_OP_RE.test(bodyText) && !callableMatch) return;
 
       // Does the effect have an unstable dep?
       const enclosingFn =
@@ -93,7 +106,7 @@ export const compoundRenderLoopRule: Rule = {
 
       // Identify the expensive operation for the message
       const opMatch = EXPENSIVE_OP_RE.exec(bodyText);
-      const op = opMatch?.[1] ?? 'an expensive operation';
+      const op = opMatch?.[1] ?? callableMatch ?? 'an expensive operation';
 
       const pos = call.getExpression().getStart();
       const { line, column } = sf.getLineAndColumnAtPos(pos);

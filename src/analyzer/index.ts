@@ -15,6 +15,7 @@ import { pollingIntervalRule } from './rules/polling-interval';
 import { clientSideFilterRule } from './rules/client-side-filter';
 import { fieldValueAtomicRule } from './rules/fieldvalue-atomic';
 import { unusedCloudFunctionRule } from './rules/unused-cloud-function';
+import { cloudfunctionInLoopRule } from './rules/cloudfunction-in-loop';
 
 const ALL_RULES = [
   unstableDepsRule,           // FCG001: unstable useEffect deps (object/array/fn/call)
@@ -33,6 +34,7 @@ const ALL_RULES = [
   clientSideFilterRule,       // FCG014: getDocs() result filtered client-side (.filter/.find on .docs)
   fieldValueAtomicRule,       // FCG015: array push/counter += written back (use arrayUnion/increment)
   unusedCloudFunctionRule,    // FCG016: Cloud Function defined but not exported (dead in bundle)
+  cloudfunctionInLoopRule,    // FCG017: httpsCallable invoked in a loop (N billed executions)
 ];
 
 export function analyzeFile(sourceText: string, filePath: string): RuleDiagnostic[] {

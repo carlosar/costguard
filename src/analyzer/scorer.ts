@@ -22,6 +22,7 @@ const PROFILES: Record<string, RuleProfile> = {
   FCG014: { categories: ['cost', 'scalability'],               points: 16 },
   FCG015: { categories: ['cost'],                              points: 12 },
   FCG016: { categories: ['cost', 'scalability'],               points: 10 },
+  FCG017: { categories: ['cost', 'scalability'],               points: 25 },
 };
 
 function toLevel(pts: number): RiskLevel {
