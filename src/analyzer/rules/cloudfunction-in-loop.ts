@@ -131,7 +131,7 @@ export const cloudfunctionInLoopRule: Rule = {
           `one call, or fan out with Promise.all() if parallel execution is acceptable.`,
         line: line - 1,
         startChar: column - 1,
-        endChar: column - 1 + calleeText.length,
+        endChar: column - 1 + callee.getText().length,
         severity: 'error',
         code: 'FCG017'
       });
