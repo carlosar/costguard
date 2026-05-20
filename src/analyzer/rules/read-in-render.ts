@@ -34,68 +34,24 @@ function isCallableInvocation(call: CallExpression, callableNames: Set<string>):
   return false;
 }
 
-// Wrappers that already guard re-execution — reads inside these are fine
-const SAFE_WRAPPERS = new Set([
-  'useEffect', 'useLayoutEffect', 'useCallback', 'useMemo',
-  'useInsertionEffect', 'startTransition',
-]);
-
-// Event handler name patterns — reads inside onClick, onSubmit, etc. are fine
-const EVENT_HANDLER_RE = /^on[A-Z]|Handler$|handle[A-Z]/;
-
-function isInsideSafeWrapper(call: Node): boolean {
-  for (const ancestor of call.getAncestors()) {
-    if (ancestor.getKind() !== SyntaxKind.CallExpression) continue;
-    const callee = (ancestor as ReturnType<typeof call.getParentIfKind>);
-    if (!callee) continue;
-    const exprText = (ancestor as any).getExpression?.()?.getText?.() ?? '';
-    if (SAFE_WRAPPERS.has(exprText)) return true;
-  }
-  return false;
-}
-
-function isInsideEventHandler(call: Node): boolean {
-  for (const ancestor of call.getAncestors()) {
-    // Arrow function or function expression assigned to an event-handler prop / variable
-    const kind = ancestor.getKind();
-    if (
-      kind === SyntaxKind.ArrowFunction ||
-      kind === SyntaxKind.FunctionExpression ||
-      kind === SyntaxKind.FunctionDeclaration
-    ) {
-      // Check the parent: if it's a variable declaration named like a handler, it's safe
-      const parent = ancestor.getParent();
-      if (!parent) continue;
-      const parentText = parent.getText();
-      // JSX attribute (onClick={...}) or variable named handleXxx / onXxx
-      if (EVENT_HANDLER_RE.test(parentText.split('=')[0]?.trim() ?? '')) return true;
-      // Variable declarator: const handleClick = () => { ... }
-      if (parent.getKind() === SyntaxKind.VariableDeclaration) {
-        const varName = (parent as any).getName?.() ?? '';
-        if (EVENT_HANDLER_RE.test(varName)) return true;
-      }
-    }
-    // JsxAttribute — onClick={() => getDoc(...)}
-    if (kind === SyntaxKind.JsxAttribute) {
-      const attrName = (ancestor as any).getNameNode?.()?.getText?.() ?? '';
-      if (EVENT_HANDLER_RE.test(attrName)) return true;
-    }
-  }
-  return false;
-}
-
-function isInsideReactComponent(call: Node): boolean {
-  // Walk ancestors looking for a function whose name starts with an uppercase
-  // letter (React component convention) or is a known hook (use*)
+// Returns true only when the call sits directly in a React component's render
+// body — i.e., the nearest enclosing function IS the component or hook itself.
+// Any intermediate function (arrow fn, named fn, useEffect callback, onClick
+// handler, helper like logAudit, etc.) means the call is NOT in render scope.
+function isDirectlyInComponentRender(call: Node): boolean {
   for (const ancestor of call.getAncestors()) {
     const kind = ancestor.getKind();
     if (kind === SyntaxKind.FunctionDeclaration) {
       const name = (ancestor as any).getName?.() ?? '';
-      if (/^[A-Z]/.test(name) || /^use[A-Z]/.test(name)) return true;
+      return /^[A-Z]/.test(name) || /^use[A-Z]/.test(name);
     }
-    if (kind === SyntaxKind.VariableDeclaration) {
-      const name = (ancestor as any).getName?.() ?? '';
-      if (/^[A-Z]/.test(name) || /^use[A-Z]/.test(name)) return true;
+    if (kind === SyntaxKind.ArrowFunction || kind === SyntaxKind.FunctionExpression) {
+      const parent = ancestor.getParent();
+      if (parent?.getKind() === SyntaxKind.VariableDeclaration) {
+        const name = (parent as any).getName?.() ?? '';
+        if (/^[A-Z]/.test(name) || /^use[A-Z]/.test(name)) return true;
+      }
+      return false; // any other fn between call and component → not in render
     }
   }
   return false;
@@ -128,9 +84,7 @@ export const readInRenderRule: Rule = {
       const isCallable = isCallableInvocation(call as CallExpression, callableNames);
       if (!isFirestoreRead && !isCallable) return;
 
-      if (!isInsideReactComponent(call)) return;
-      if (isInsideSafeWrapper(call)) return;
-      if (isInsideEventHandler(call)) return;
+      if (!isDirectlyInComponentRender(call)) return;
 
       const pos = call.getExpression().getStart();
       const { line, column } = sf.getLineAndColumnAtPos(pos);
