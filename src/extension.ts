@@ -6,6 +6,7 @@ import { computeRiskScore } from './analyzer/scorer';
 import { RiskScore, RiskLevel } from './analyzer/types';
 import { runSetupWizard, findGitRoot } from './setup';
 import { generateReport } from './reporter';
+import { initTelemetry, trackEvent, disposeTelemetry } from './telemetry';
 
 const SUPPORTED = new Set(['typescript', 'typescriptreact', 'javascript', 'javascriptreact']);
 const SUPPORTED_SELECTOR = [
@@ -64,7 +65,7 @@ function highestLevel(score: RiskScore): RiskLevel {
 
 // ── Core analysis ─────────────────────────────────────────────────────────────
 
-function analyzeDoc(doc: vscode.TextDocument): void {
+function analyzeDoc(doc: vscode.TextDocument, source?: 'open' | 'save'): void {
   if (!SUPPORTED.has(doc.languageId)) return;
 
   const enabled = vscode.workspace.getConfiguration('costGuard').get<boolean>('enable', true);
@@ -81,6 +82,16 @@ function analyzeDoc(doc: vscode.TextDocument): void {
 
   riskCache.set(doc.uri.toString(), score);
   codeLensProvider.refresh();
+
+  if (source && score.violationCount > 0) {
+    trackEvent('scan.completed', {
+      riskLevel: highestLevel(score),
+      source,
+    }, {
+      violationCount: score.violationCount,
+      score: score.overall,
+    });
+  }
 
   diagnosticCollection.set(doc.uri, findings.map(d => {
     const range = new vscode.Range(
@@ -158,6 +169,10 @@ function hasAnyProtection(workspaceRoot: string): boolean {
 // ── Activation ────────────────────────────────────────────────────────────────
 
 export function activate(context: vscode.ExtensionContext): void {
+  const telemetry = initTelemetry();
+  context.subscriptions.push(telemetry);
+  trackEvent('extension.activated', { version: context.extension.packageJSON.version as string });
+
   diagnosticCollection = vscode.languages.createDiagnosticCollection('costguard');
   context.subscriptions.push(diagnosticCollection);
 
@@ -173,7 +188,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // Setup wizard command
   context.subscriptions.push(
     vscode.commands.registerCommand('costGuard.setup', () => {
-      runSetupWizard(context, false);
+      runSetupWizard(context, false, trackEvent);
     })
   );
 
@@ -187,7 +202,7 @@ export function activate(context: vscode.ExtensionContext): void {
         'Set Up Now',
         'Later',
       ).then(choice => {
-        if (choice === 'Set Up Now') runSetupWizard(context, true);
+        if (choice === 'Set Up Now') runSetupWizard(context, true, trackEvent);
         if (choice === 'Later')      context.globalState.update('costguard.setupDismissed', true);
       });
     })
@@ -250,7 +265,7 @@ export function activate(context: vscode.ExtensionContext): void {
         'Set Up Now',
         'Later',
       ).then(choice => {
-        if (choice === 'Set Up Now') runSetupWizard(context, true);
+        if (choice === 'Set Up Now') runSetupWizard(context, true, trackEvent);
         if (choice === 'Later')      context.globalState.update('costguard.setupDismissed', true);
       });
     };
@@ -289,8 +304,8 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   context.subscriptions.push(
-    vscode.workspace.onDidOpenTextDocument(doc  => analyzeDoc(doc)),
-    vscode.workspace.onDidSaveTextDocument(doc  => analyzeDoc(doc)),
+    vscode.workspace.onDidOpenTextDocument(doc  => analyzeDoc(doc, 'open')),
+    vscode.workspace.onDidSaveTextDocument(doc  => analyzeDoc(doc, 'save')),
     vscode.workspace.onDidChangeTextDocument(event => {
       const doc = event.document;
       if (!SUPPORTED.has(doc.languageId)) return;
@@ -323,4 +338,5 @@ export function activate(context: vscode.ExtensionContext): void {
 
 export function deactivate(): void {
   diagnosticCollection?.clear();
+  disposeTelemetry();
 }

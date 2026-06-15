@@ -100,6 +100,7 @@ function detectIndent(raw: string): number | string {
 export async function runSetupWizard(
   context: vscode.ExtensionContext,
   isFirstRun: boolean,
+  track: (name: string, props?: Record<string, string>) => void = () => {},
 ): Promise<void> {
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
@@ -136,6 +137,8 @@ export async function runSetupWizard(
     },
   ];
 
+  track('setup.wizard.opened', { trigger: isFirstRun ? 'banner' : 'command' });
+
   const selected = await vscode.window.showQuickPick(features, {
     canPickMany:   true,
     title:         isFirstRun
@@ -147,6 +150,7 @@ export async function runSetupWizard(
 
   // User pressed Esc — record dismissal so we don't auto-pop again immediately
   if (!selected) {
+    track('setup.wizard.dismissed');
     context.globalState.update('costguard.setupDismissed', true);
     return;
   }
@@ -190,6 +194,7 @@ export async function runSetupWizard(
 
   context.globalState.update('costguard.setupComplete', true);
   context.globalState.update('costguard.setupDismissed', false);
+  track('setup.completed', { layers: [...ids].join(',') });
 
   // ── Summary notification ───────────────────────────────────────────────────
   if (done.length === 0 && skipped.length === 0) {
