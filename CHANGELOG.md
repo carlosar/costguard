@@ -1,3 +1,15 @@
+# [0.4.0](https://github.com/carlosar/costguard/compare/v0.3.1...v0.4.0) (2026-06-15)
+
+
+### Bug Fixes
+
+* remove circular costguard self-dep and hardcoded predeploy path ([a8727dc](https://github.com/carlosar/costguard/commit/a8727dcedcfda77b128b72836aae2e6a3286067c))
+
+
+### Features
+
+* add opt-in telemetry via @vscode/extension-telemetry ([8eea11c](https://github.com/carlosar/costguard/commit/8eea11c87466666e52e876d90a5c1646578876af))
+
 ## [0.3.1](https://github.com/carlosar/costguard/compare/v0.3.0...v0.3.1) (2026-06-13)
 
 
