@@ -15,7 +15,7 @@
       "@semantic-release/exec",
       {
         "prepareCmd": "npm run vscode:prepublish && npm run package",
-        "publishCmd": "npx vsce publish --pat ${VSCE_PAT} --packagePath costguard-${nextRelease.version}.vsix"
+        "publishCmd": "npx vsce publish --pat $VSCE_PAT --packagePath costguard-${nextRelease.version}.vsix"
       }
     ],
     [
