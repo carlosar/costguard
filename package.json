@@ -64,7 +64,7 @@
     "package": "vsce package --allow-missing-repository",
     "vscode:publish": "vsce publish",
     "setup-hooks": "node scripts/setup-hooks.js",
-    "predeploy": "node \"c:/Users/Carlos/.vscode/extensions/soarone.costguard-0.3.1/out/cli.js\" src/ --max-risk=MEDIUM",
+    "predeploy": "node out/cli.js src/ --max-risk=MEDIUM",
     "prepare": "husky",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -85,7 +85,6 @@
     "semantic-release": "^25.0.3",
     "ts-morph": "^21.0.0",
     "typescript": "^5.3.0",
-    "vitest": "^4.1.8",
-    "costguard": "latest"
+    "vitest": "^4.1.8"
   }
 }
