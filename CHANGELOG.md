@@ -1,3 +1,10 @@
+## [0.4.1](https://github.com/carlosar/costguard/compare/v0.4.0...v0.4.1) (2026-06-15)
+
+
+### Bug Fixes
+
+* use shell var syntax for VSCE_PAT in publishCmd ([2dc8579](https://github.com/carlosar/costguard/commit/2dc857962e8ab4c27c471c7e3d96031be9e56116))
+
 # [0.4.0](https://github.com/carlosar/costguard/compare/v0.3.1...v0.4.0) (2026-06-15)
 
 
