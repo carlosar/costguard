@@ -1,3 +1,10 @@
+## [0.4.2](https://github.com/carlosar/costguard/compare/v0.4.1...v0.4.2) (2026-06-17)
+
+
+### Bug Fixes
+
+* suppress setup banner when no workspace folder is open ([b6c4f17](https://github.com/carlosar/costguard/commit/b6c4f17b7da38cc91296391a7a70440e71b42295))
+
 ## [0.4.1](https://github.com/carlosar/costguard/compare/v0.4.0...v0.4.1) (2026-06-15)
 
 
