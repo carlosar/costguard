@@ -250,7 +250,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // Reset whichever flags are set whenever no protection layer is installed.
   const protection = workspaceRoot ? hasAnyProtection(workspaceRoot) : false;
   console.log(`[CostGuard] workspaceRoot=${workspaceRoot} protection=${protection} setupComplete=${setupComplete} setupDismissed=${setupDismissed}`);
-  if (!workspaceRoot || !protection) {
+  if (workspaceRoot && !protection) {
     if (setupComplete)  { setupComplete  = false; context.globalState.update('costguard.setupComplete',  false); }
     if (setupDismissed) { setupDismissed = false; context.globalState.update('costguard.setupDismissed', false); }
   }
@@ -278,7 +278,7 @@ export function activate(context: vscode.ExtensionContext): void {
       const onOpen = vscode.workspace.onDidOpenTextDocument(() => {
         onOpen.dispose();
         const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-        if (wsRoot && hasAnyProtection(wsRoot)) return; // protection in place, skip
+        if (!wsRoot || hasAnyProtection(wsRoot)) return; // no workspace or protection in place, skip
         showBanner();
       });
       context.subscriptions.push(onOpen);
