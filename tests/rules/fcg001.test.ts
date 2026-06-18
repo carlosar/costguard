@@ -85,6 +85,34 @@ describe('FCG001 — unstable useEffect dependency', () => {
     expect(diags.filter(d => d.code === 'FCG001')).toHaveLength(0);
   });
 
+  it('fires when a state setter for a dep is called inside the same effect', () => {
+    const src = `
+      function MyComponent() {
+        const [users, setUsers] = useState([]);
+        useEffect(() => {
+          async function loadData() {
+            const snapshot = await getDocs(collection(db, 'users'));
+            setUsers(snapshot.docs.map(d => d.data()));
+          }
+          loadData();
+        }, [users]);
+      }
+    `;
+    const diags = unstableDepsRule.analyze(src, FILE);
+    expect(diags.filter(d => d.code === 'FCG001')).toHaveLength(1);
+  });
+
+  it('does not fire when the state setter is not called in the effect', () => {
+    const src = `
+      function MyComponent() {
+        const [userId, setUserId] = useState('');
+        useEffect(() => { fetchUser(userId); }, [userId]);
+      }
+    `;
+    const diags = unstableDepsRule.analyze(src, FILE);
+    expect(diags.filter(d => d.code === 'FCG001')).toHaveLength(0);
+  });
+
   it('does not fire when there is no deps array', () => {
     const src = `
       function MyComponent() {

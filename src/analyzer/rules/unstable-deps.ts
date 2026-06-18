@@ -13,6 +13,32 @@ import { Rule, RuleDiagnostic } from '../types';
 
 const STABLE_WRAPPERS = new Set(['useMemo', 'useCallback', 'useRef', 'useState', 'useReducer']);
 
+// Maps each useState setter name to the state variable name it updates,
+// e.g. `const [users, setUsers] = useState([])` -> setUsers -> users
+function findStateSetters(enclosingFn: Node): Map<string, string> {
+  const setters = new Map<string, string>();
+  enclosingFn.getDescendantsOfKind(SyntaxKind.VariableDeclaration).forEach(vd => {
+    const nameNode = vd.getNameNode();
+    if (nameNode.getKind() !== SyntaxKind.ArrayBindingPattern) return;
+
+    const init = vd.getInitializer();
+    if (!init || init.getKind() !== SyntaxKind.CallExpression) return;
+    const callee = init.asKindOrThrow(SyntaxKind.CallExpression).getExpression().getText();
+    if (callee !== 'useState' && !callee.endsWith('.useState')) return;
+
+    const elements = nameNode.asKindOrThrow(SyntaxKind.ArrayBindingPattern).getElements();
+    if (elements.length < 2) return;
+    const [stateEl, setterEl] = elements;
+    if (stateEl.getKind() !== SyntaxKind.BindingElement) return;
+    if (setterEl.getKind() !== SyntaxKind.BindingElement) return;
+
+    const stateName = stateEl.asKindOrThrow(SyntaxKind.BindingElement).getName();
+    const setterName = setterEl.asKindOrThrow(SyntaxKind.BindingElement).getName();
+    setters.set(setterName, stateName);
+  });
+  return setters;
+}
+
 export const unstableDepsRule: Rule = {
   id: 'FCG001',
 
@@ -45,6 +71,31 @@ export const unstableDepsRule: Rule = {
       const varDecls = new Map<string, Node>();
       enclosingFn.getDescendantsOfKind(SyntaxKind.VariableDeclaration).forEach(vd => {
         varDecls.set(vd.getName(), vd.getInitializer() ?? vd);
+      });
+
+      // Does the effect call a state setter for a state variable that is also
+      // in its own deps array? That's a self-triggering infinite loop:
+      // effect runs -> setState -> re-render -> effect sees "new" dep -> runs again.
+      const stateSetters = findStateSetters(enclosingFn);
+      const callbackBody = args[0].getText();
+      depsArg.getDescendantsOfKind(SyntaxKind.Identifier).forEach(depId => {
+        const name = depId.getText();
+        const selfSettingSetter = [...stateSetters.entries()].find(
+          ([, stateName]) => stateName === name
+        )?.[0];
+        if (!selfSettingSetter) return;
+        if (!new RegExp(`\\b${selfSettingSetter}\\s*\\(`).test(callbackBody)) return;
+
+        const pos = depId.getStart();
+        const { line, column } = sf.getLineAndColumnAtPos(pos);
+        diagnostics.push({
+          message: `[FCG001] '${name}' is updated inside this same useEffect (via ${selfSettingSetter}) while also being listed as a dependency — the state update triggers a re-render, which re-runs the effect, which updates the state again: an infinite loop. Fix: remove '${name}' from the dependency array, or restructure the effect so it doesn't depend on state it sets.`,
+          line: line - 1,
+          startChar: column - 1,
+          endChar: column - 1 + name.length,
+          severity: 'error',
+          code: 'FCG001'
+        });
       });
 
       // Check every identifier in the deps array
