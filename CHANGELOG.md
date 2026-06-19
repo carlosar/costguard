@@ -1,3 +1,10 @@
+## [0.4.3](https://github.com/carlosar/costguard/compare/v0.4.2...v0.4.3) (2026-06-19)
+
+
+### Bug Fixes
+
+* **fcg001:** detect state setter called inside its own dependent useEffect ([7d2a4d9](https://github.com/carlosar/costguard/commit/7d2a4d9b81b887ebe654ef989a377abf24e08945))
+
 ## [0.4.2](https://github.com/carlosar/costguard/compare/v0.4.1...v0.4.2) (2026-06-17)
 
 
