@@ -38,6 +38,10 @@
     {
       "path": "images/statusbar.png",
       "alt": "Status bar risk indicator"
+    },
+    {
+      "path": "images/pr-gate.png",
+      "alt": "GitHub Actions PR gate risk card comment"
     }
   ],
   "main": "./out/extension.js",

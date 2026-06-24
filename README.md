@@ -222,9 +222,7 @@ Installed automatically by the setup wizard into `.git/hooks/pre-commit`.
 ### GitHub Actions PR gate
 Runs on every pull request and posts a risk card comment. Fails the required check if HIGH risk violations are found, blocking the merge.
 
-| File | Score | Cost | Scalability | Memory Leak | Violations |
-|---|---|---|---|---|---|
-| `src/invoices.tsx` | 🔴 58/100 | 🔴 HIGH | 🟢 LOW | 🔴 HIGH | 2 |
+![CostGuard PR gate risk card](images/pr-gate.png)
 
 The workflow is written to `.github/workflows/costguard.yml` by the setup wizard. Requires `costguard` in `devDependencies` (added automatically).
 
