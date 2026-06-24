@@ -35,7 +35,7 @@ jobs:
       - name: Run CostGuard on src/
         id: scan
         # Always exit 0 here so we can post the comment even on failure
-        run: node out/cli.js src/ --json > costguard-report.json 2>&1 || true
+        run: node out/cli.js demo/ --json > costguard-report.json 2>&1 || true
 
       - name: Post PR comment
         uses: actions/github-script@v7
