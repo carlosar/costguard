@@ -1,3 +1,10 @@
+## [0.5.1](https://github.com/carlosar/costguard/compare/v0.5.0...v0.5.1) (2026-06-24)
+
+
+### Bug Fixes
+
+* **ci:** correct repo-root paths in PR gate workflow ([1820afb](https://github.com/carlosar/costguard/commit/1820afb28ca19a8f2ffcf4f4a011f33addeead7d))
+
 # [0.5.0](https://github.com/carlosar/costguard/compare/v0.4.3...v0.5.0) (2026-06-24)
 
 
