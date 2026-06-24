@@ -24,20 +24,18 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: firebase-cost-guard/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
-        working-directory: firebase-cost-guard
 
       - name: Compile
         run: npm run compile
-        working-directory: firebase-cost-guard
 
       - name: Run CostGuard on src/
         id: scan
         # Always exit 0 here so we can post the comment even on failure
-        run: node firebase-cost-guard/out/cli.js src/ --json > costguard-report.json 2>&1 || true
+        run: node out/cli.js src/ --json > costguard-report.json 2>&1 || true
 
       - name: Post PR comment
         uses: actions/github-script@v7
