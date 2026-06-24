@@ -1,3 +1,10 @@
+# [0.5.0](https://github.com/carlosar/costguard/compare/v0.4.3...v0.5.0) (2026-06-24)
+
+
+### Features
+
+* add copy-fix-prompt quick action and refresh README marketplace listing ([af2e22c](https://github.com/carlosar/costguard/commit/af2e22cd0d340e0a441131ad152f3d033da2117a))
+
 ## [0.4.3](https://github.com/carlosar/costguard/compare/v0.4.2...v0.4.3) (2026-06-19)
 
 
