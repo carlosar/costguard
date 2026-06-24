@@ -48,6 +48,45 @@ class RiskCodeLensProvider implements vscode.CodeLensProvider {
   }
 }
 
+// ── Copy-fix-prompt code action ───────────────────────────────────────────────
+
+class CopyFixPromptActionProvider implements vscode.CodeActionProvider {
+  static readonly providedCodeActionKinds = [vscode.CodeActionKind.QuickFix];
+
+  provideCodeActions(
+    document: vscode.TextDocument,
+    _range: vscode.Range | vscode.Selection,
+    context: vscode.CodeActionContext
+  ): vscode.CodeAction[] {
+    return context.diagnostics
+      .filter(d => d.source === 'CostGuard')
+      .map(diagnostic => {
+        const action = new vscode.CodeAction('Copy fix prompt for AI', vscode.CodeActionKind.QuickFix);
+        action.diagnostics = [diagnostic];
+        action.command = {
+          command: 'costGuard.copyFixPrompt',
+          title: 'Copy fix prompt for AI',
+          arguments: [document.uri, diagnostic],
+        };
+        return action;
+      });
+  }
+}
+
+function buildFixPrompt(document: vscode.TextDocument, diagnostic: vscode.Diagnostic): string {
+  const startLine = Math.max(0, diagnostic.range.start.line - 2);
+  const endLine   = Math.min(document.lineCount - 1, diagnostic.range.end.line + 2);
+  const snippet   = document.getText(new vscode.Range(startLine, 0, endLine, document.lineAt(endLine).text.length));
+
+  return (
+    `Fix this CostGuard violation (${diagnostic.code}) in ${path.basename(document.fileName)} ` +
+    `at line ${diagnostic.range.start.line + 1}:\n\n` +
+    `${diagnostic.message}\n\n` +
+    '```\n' + snippet + '\n```\n\n' +
+    'Rewrite the code above to fix this issue while preserving existing behavior.'
+  );
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function levelLabel(level: RiskLevel): string {
@@ -183,6 +222,20 @@ export function activate(context: vscode.ExtensionContext): void {
   codeLensProvider = new RiskCodeLensProvider();
   context.subscriptions.push(
     vscode.languages.registerCodeLensProvider(SUPPORTED_SELECTOR, codeLensProvider)
+  );
+
+  context.subscriptions.push(
+    vscode.languages.registerCodeActionsProvider(SUPPORTED_SELECTOR, new CopyFixPromptActionProvider(), {
+      providedCodeActionKinds: CopyFixPromptActionProvider.providedCodeActionKinds,
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('costGuard.copyFixPrompt', async (uri: vscode.Uri, diagnostic: vscode.Diagnostic) => {
+      const doc = await vscode.workspace.openTextDocument(uri);
+      await vscode.env.clipboard.writeText(buildFixPrompt(doc, diagnostic));
+      vscode.window.showInformationMessage('CostGuard: Fix prompt copied — paste it into your AI assistant.');
+    })
   );
 
   // Setup wizard command

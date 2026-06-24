@@ -1,8 +1,43 @@
+> Stop Firebase bill shock before it hits production — CostGuard catches
+> expensive patterns as you type, blocks risky commits, and gates your deploys.
+
+![CostGuard demo](images/demo.gif)
+
 # CostGuard
 
 Catch expensive Firebase and React patterns before they hit production — and before they hit your bill.
 
 CostGuard is a VS Code extension that detects runaway Firestore reads, missing listener cleanup, render loops, and other cost-heavy patterns as you write code. It adds inline squiggles, a per-file risk score, and optional gates that block bad code from being committed, merged, or deployed.
+
+**[Install from the VS Code Marketplace →](https://marketplace.visualstudio.com/items?itemName=soarone.costguard)**
+
+---
+
+## What it catches
+
+**Example: one unbounded read can quietly cost ~$90/month**
+
+```ts
+// Bad — reads every document in the collection, on every load
+const snap = await getDocs(collection(db, 'invoices')); // ← FCG002
+```
+
+If `invoices` has 10,000 documents and this query runs on a dashboard
+visited by 500 users a day:
+
+```
+10,000 docs × 500 loads/day = 5,000,000 reads/day
+5,000,000 × 30 days         = 150,000,000 reads/month
+150,000,000 / 100,000 × $0.06 (Firestore read price) ≈ $90/month
+```
+
+— for one query, before the feature that uses it has shipped. CostGuard
+flags this the instant you type it, with the fix inline:
+
+```ts
+// Fix — cap it, then paginate or query for more as needed
+const snap = await getDocs(query(collection(db, 'invoices'), limit(50)));
+```
 
 ---
 
@@ -10,6 +45,9 @@ CostGuard is a VS Code extension that detects runaway Firestore reads, missing l
 
 ### Live diagnostics
 Squiggles appear as you type (500ms debounce). No save required.
+
+### Copy fix prompt for AI
+Click the lightbulb (or `Cmd/Ctrl+.`) on any squiggle and choose **Copy fix prompt for AI**. CostGuard copies the violation message plus the surrounding code to your clipboard as a ready-to-paste prompt — drop it straight into ChatGPT, Claude, or Copilot Chat to get a fix.
 
 ### Risk scoring
 Every flagged file gets a score and a breakdown by risk category, visible inline and in the status bar.

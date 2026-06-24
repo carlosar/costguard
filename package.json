@@ -22,6 +22,15 @@
     "type": "git",
     "url": "git+https://github.com/carlosar/costguard.git"
   },
+  "galleryBanner": {
+     "color": "#1a1a2e",
+     "theme": "dark"
+   },
+   "screenshots": [
+     { "path": "images/squiggles.png", "alt": "Inline cost violation squiggles with fix suggestions" },
+     { "path": "images/codelens.png",  "alt": "CodeLens risk score at top of file" },
+     { "path": "images/statusbar.png", "alt": "Status bar risk indicator" }
+   ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -40,6 +49,10 @@
       {
         "command": "costGuard.resetSetup",
         "title": "CostGuard: Reset Setup State"
+      },
+      {
+        "command": "costGuard.copyFixPrompt",
+        "title": "CostGuard: Copy Fix Prompt for AI"
       }
     ],
     "configuration": {
