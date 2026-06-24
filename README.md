@@ -172,6 +172,148 @@ useEffect(() => {
 }, []);
 ```
 
+### FCG007 — addEventListener without cleanup `error`
+`addEventListener` inside a `useEffect` with no `removeEventListener` returned. Each remount adds a duplicate listener that's never removed, so handlers fire multiple times and the component leaks memory.
+
+```ts
+// Bad — listener leaks on every remount
+useEffect(() => {
+  window.addEventListener('resize', handler); // ← FCG007
+}, []);
+
+// Fix
+useEffect(() => {
+  window.addEventListener('resize', handler);
+  return () => window.removeEventListener('resize', handler);
+}, []);
+```
+
+### FCG008 — fetch/axios inside a loop `error`
+`fetch` or `axios` calls inside `for`, `while`, `forEach`, `map`, or similar constructs. The same N+1 problem as FCG005, but for any billed HTTP API (Stripe, OpenAI, maps, etc.) instead of Firestore.
+
+```ts
+// Bad — one HTTP request per item
+for (const id of ids) {
+  await fetch(`/api/items/${id}`); // ← FCG008
+}
+
+// Fix — fan out in parallel or use a bulk endpoint
+await Promise.all(ids.map(id => fetch(`/api/items/${id}`)));
+```
+
+### FCG009 — Firestore read in component body `error`
+`getDoc`/`getDocs` (or a Cloud Function call) made directly in a component or hook body instead of inside `useEffect`. It re-fires on every render with no caching — a component re-rendering 10×/second runs 10 reads/second.
+
+```ts
+// Bad — refetches every render
+function Invoice({ id }: { id: string }) {
+  const snap = getDoc(doc(db, 'invoices', id)); // ← FCG009
+}
+
+// Fix
+useEffect(() => { getDoc(doc(db, 'invoices', id)).then(setInvoice); }, [id]);
+```
+
+### FCG010 — Compound render loop `error`
+A `useEffect` with both an unstable dependency (new object/array/function reference every render) **and** an expensive operation (`getDoc`, `onSnapshot`, `fetch`) in its body. The two problems amplify each other: the effect re-runs every render, fires the expensive call, which may update state and re-render — an infinite billing loop.
+
+```ts
+// Bad — config is a new reference every render, and onSnapshot reads on every re-run
+const config = getFirebaseConfig();
+useEffect(() => {
+  return onSnapshot(collection(db, 'dunning_log'), handler);
+}, [config]); // ← FCG010
+
+// Fix — stabilize the dependency first
+const config = useMemo(() => getFirebaseConfig(), []);
+```
+
+### FCG011 — Expensive operation in a high-frequency handler `error`
+`getDoc`, `fetch`, or similar calls inside `scroll`, `mousemove`, `resize`, `keydown`, or `input` handlers with no debounce/throttle. These events fire up to hundreds of times per second.
+
+```ts
+// Bad — fires a read on every scroll event
+window.addEventListener('scroll', () => getDoc(ref)); // ← FCG011
+
+// Fix
+window.addEventListener('scroll', debounce(() => getDoc(ref), 300));
+```
+
+### FCG012 — Unbatched Firestore writes in a loop `error`
+`addDoc`/`setDoc`/`updateDoc`/`deleteDoc` inside a loop fires one separate billed write and network round-trip per iteration.
+
+```ts
+// Bad — one write per item
+for (const item of items) {
+  await setDoc(doc(db, 'items', item.id), item); // ← FCG012
+}
+
+// Fix — up to 500 ops per batch
+const batch = writeBatch(db);
+items.forEach(item => batch.set(doc(db, 'items', item.id), item));
+await batch.commit();
+```
+
+### FCG013 — Polling Firestore with setInterval `warning`
+`setInterval`/recursive `setTimeout` wrapping `getDoc`/`getDocs` polls on every tick regardless of whether the data changed — every tick is a billed read.
+
+```ts
+// Bad — billed read every 5 seconds, changed or not
+setInterval(() => getDocs(collection(db, 'orders')), 5000); // ← FCG013
+
+// Fix — only fires when data actually changes
+onSnapshot(collection(db, 'orders'), handler);
+```
+
+### FCG014 — Client-side filtering of an unfiltered read `warning`
+`.filter()`/`.find()` applied to a `getDocs()` result with no `.where()` clause. The entire collection is fetched and billed before most of it is discarded.
+
+```ts
+// Bad — fetches everything, keeps a fraction
+const snap = await getDocs(collection(db, 'orders'));
+const pending = snap.docs.filter(d => d.data().status === 'pending'); // ← FCG014
+
+// Fix — filter server-side
+const q = query(collection(db, 'orders'), where('status', '==', 'pending'));
+const snap = await getDocs(q);
+```
+
+### FCG015 — Read-modify-write instead of FieldValue atomics `warning`
+Reading a document, mutating an array/counter field in JS, then writing the whole document back. Costs an extra read and loses updates under concurrent writes.
+
+```ts
+// Bad — extra read, race condition under concurrent writes
+const data = (await getDoc(ref)).data();
+await updateDoc(ref, { count: data.count + 1 }); // ← FCG015
+
+// Fix — atomic, no read needed
+await updateDoc(ref, { count: increment(1) });
+```
+
+### FCG016 — Cloud Function defined but not exported `warning`
+A Cloud Function assigned to a variable without `export`. Firebase will never deploy it — it's dead weight in the functions bundle that slows cold starts for every other function in the file.
+
+```ts
+// Bad — never deployed
+const onUserCreate = onDocumentCreated('users/{id}', handler); // ← FCG016
+
+// Fix
+export const onUserCreate = onDocumentCreated('users/{id}', handler);
+```
+
+### FCG017 — Cloud Function invoked in a loop `error`
+A function created with `httpsCallable()` invoked inside a loop. Each call bills a separate Cloud Function execution — N items costs N executions instead of one.
+
+```ts
+// Bad — one billed execution per item
+for (const item of items) {
+  await sendNotification(item); // ← FCG017
+}
+
+// Fix — redesign for a batch payload, or fan out in parallel
+await Promise.all(items.map(item => sendNotification(item)));
+```
+
 ---
 
 ## Risk scoring
@@ -186,6 +328,17 @@ Each violation carries a point weight based on its real-world cost impact. Score
 | FCG004 No snapshot cleanup | Memory Leak | 22 |
 | FCG005 Read in loop | Cost + Scalability | 20 |
 | FCG006 No interval cleanup | Memory Leak | 18 |
+| FCG007 No event listener cleanup | Memory Leak | 15 |
+| FCG008 Fetch/axios in loop | Cost + Scalability | 20 |
+| FCG009 Read in render | Cost + Scalability | 16 |
+| FCG010 Compound render loop | Cost + Scalability + Memory Leak | 35 |
+| FCG011 Expensive op in high-freq handler | Cost + Scalability | 25 |
+| FCG012 Unbatched writes in loop | Cost + Scalability | 20 |
+| FCG013 Polling instead of onSnapshot | Cost + Scalability | 18 |
+| FCG014 Client-side filter | Cost + Scalability | 16 |
+| FCG015 Read-modify-write | Cost | 12 |
+| FCG016 Unexported Cloud Function | Cost + Scalability | 10 |
+| FCG017 Cloud Function in loop | Cost + Scalability | 25 |
 
 **Risk levels per category**
 
