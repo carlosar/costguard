@@ -73,7 +73,7 @@ function addCostguardDevDep(workspaceRoot: string): void {
   fs.writeFileSync(pkgFile, JSON.stringify(pkg, null, detectIndent(raw)) + '\n');
 }
 
-function installDeployGate(workspaceRoot: string, cliPath: string): void {
+function installDeployGate(workspaceRoot: string): void {
   const pkgFile = path.join(workspaceRoot, 'package.json');
   if (!fs.existsSync(pkgFile)) return;
 
@@ -82,8 +82,11 @@ function installDeployGate(workspaceRoot: string, cliPath: string): void {
 
   if (pkg.scripts?.predeploy?.includes('costguard')) return;
 
+  // Use the project's own costguard devDependency (via npx) rather than the
+  // locally-installed extension's path — predeploy ships in package.json and
+  // must work on any machine/CI runner, not just the one that ran the wizard.
   pkg.scripts          = pkg.scripts ?? {};
-  pkg.scripts.predeploy = `node "${unixPath(cliPath)}" src/ --max-risk=MEDIUM`;
+  pkg.scripts.predeploy = 'npx costguard src/ --max-risk=MEDIUM';
 
   fs.writeFileSync(pkgFile, JSON.stringify(pkg, null, detectIndent(raw)) + '\n');
 }
@@ -173,10 +176,17 @@ export async function runSetupWizard(
     }
   }
 
+  if (ids.has('github') || ids.has('deploy')) {
+    try {
+      addCostguardDevDep(workspaceRoot);
+    } catch {
+      // non-fatal — predeploy/CI will still work if costguard is installed another way
+    }
+  }
+
   if (ids.has('github')) {
     try {
       installGitHubActions(workspaceRoot, context.extensionPath);
-      addCostguardDevDep(workspaceRoot);
       done.push('GitHub Actions workflow');
     } catch (e: unknown) {
       skipped.push(`GitHub Actions (${(e as Error).message})`);
@@ -185,7 +195,7 @@ export async function runSetupWizard(
 
   if (ids.has('deploy')) {
     try {
-      installDeployGate(workspaceRoot, cliPath);
+      installDeployGate(workspaceRoot);
       done.push('deploy gate');
     } catch (e: unknown) {
       skipped.push(`deploy gate (${(e as Error).message})`);
