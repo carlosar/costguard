@@ -1,3 +1,10 @@
+## [0.5.3](https://github.com/carlosar/costguard/compare/v0.5.2...v0.5.3) (2026-06-29)
+
+
+### Bug Fixes
+
+* **npm:** exclude VS Code extension bundle and marketing assets from CLI package ([6d63790](https://github.com/carlosar/costguard/commit/6d63790b36546359b56f345cfddef96027b18b37))
+
 ## [0.5.2](https://github.com/carlosar/costguard/compare/v0.5.1...v0.5.2) (2026-06-29)
 
 
