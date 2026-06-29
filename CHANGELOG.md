@@ -1,3 +1,10 @@
+## [0.5.2](https://github.com/carlosar/costguard/compare/v0.5.1...v0.5.2) (2026-06-29)
+
+
+### Bug Fixes
+
+* **setup:** make deploy gate predeploy script portable ([8cc10fd](https://github.com/carlosar/costguard/commit/8cc10fd709e42dc2168100a122f61233e13c6fa3))
+
 ## [0.5.1](https://github.com/carlosar/costguard/compare/v0.5.0...v0.5.1) (2026-06-24)
 
 
