@@ -15,6 +15,10 @@ vitest.config.ts
 .releaserc.json
 commitlint.config.js
 LAUNCH_GUIDE.md
+DEVTO_ARTICLE.md
 CHANGELOG.md
 icon.png
 out/*.map
+out/extension.js
+images/
+demo/
