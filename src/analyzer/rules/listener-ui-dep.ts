@@ -11,7 +11,7 @@
  * switch re-subscribed 13+ collections simultaneously.
  */
 
-import { Project, SyntaxKind } from 'ts-morph';
+import { Project, SourceFile, SyntaxKind } from 'ts-morph';
 import { Rule, RuleDiagnostic } from '../types';
 
 // Patterns that suggest a variable is UI/navigation state rather than auth/data state
@@ -50,13 +50,14 @@ function looksLikeUiState(name: string): boolean {
 export const listenerUiDepRule: Rule = {
   id: 'FCG003',
 
-  analyze(sourceText: string, filePath: string): RuleDiagnostic[] {
-    const project = new Project({
-      useInMemoryFileSystem: true,
-      skipFileDependencyResolution: true,
-      compilerOptions: { allowJs: true, jsx: 4 }
-    });
-    const sf = project.createSourceFile(filePath.replace(/\\/g, '/'), sourceText);
+  analyze(sourceText: string, filePath: string, sharedSf?: SourceFile): RuleDiagnostic[] {
+    let sf: SourceFile;
+    if (sharedSf) {
+      sf = sharedSf;
+    } else {
+      const project = new Project({ useInMemoryFileSystem: true, skipFileDependencyResolution: true, compilerOptions: { allowJs: true, jsx: 4 } });
+      sf = project.createSourceFile(filePath.replace(/\\/g, '/'), sourceText);
+    }
     const diagnostics: RuleDiagnostic[] = [];
 
     sf.getDescendantsOfKind(SyntaxKind.CallExpression).forEach(call => {

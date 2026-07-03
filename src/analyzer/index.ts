@@ -1,3 +1,4 @@
+import { Project } from 'ts-morph';
 import { RuleDiagnostic } from './types';
 import { unstableDepsRule } from './rules/unstable-deps';
 import { unboundedReadRule } from './rules/unbounded-read';
@@ -38,10 +39,17 @@ const ALL_RULES = [
 ];
 
 export function analyzeFile(sourceText: string, filePath: string): RuleDiagnostic[] {
+  const project = new Project({
+    useInMemoryFileSystem: true,
+    skipFileDependencyResolution: true,
+    compilerOptions: { allowJs: true, jsx: 4 },
+  });
+  const sf = project.createSourceFile(filePath.replace(/\\/g, '/'), sourceText);
+
   const results: RuleDiagnostic[] = [];
   for (const rule of ALL_RULES) {
     try {
-      results.push(...rule.analyze(sourceText, filePath));
+      results.push(...rule.analyze(sourceText, filePath, sf));
     } catch {
       // Never let a rule crash crash the extension
     }

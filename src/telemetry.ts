@@ -4,12 +4,18 @@ import { TelemetryReporter } from '@vscode/extension-telemetry';
 // Create a free resource at: portal.azure.com → Application Insights → New
 // Then copy the "Connection String" from the Overview page.
 const CONNECTION_STRING = 'PASTE_APPINSIGHTS_CONNECTION_STRING_HERE';
+const PLACEHOLDER = 'PASTE_APPINSIGHTS_CONNECTION_STRING_HERE';
 
 let reporter: TelemetryReporter | undefined;
 
-export function initTelemetry(): TelemetryReporter {
-  reporter = new TelemetryReporter(CONNECTION_STRING);
-  return reporter;
+export function initTelemetry(): TelemetryReporter | undefined {
+  if (CONNECTION_STRING === PLACEHOLDER) return undefined;
+  try {
+    reporter = new TelemetryReporter(CONNECTION_STRING);
+    return reporter;
+  } catch {
+    return undefined;
+  }
 }
 
 export function trackEvent(

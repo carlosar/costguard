@@ -1,3 +1,5 @@
+import { SourceFile } from 'ts-morph';
+
 export interface RuleDiagnostic {
   /** Human-readable explanation + fix suggestion */
   message: string;
@@ -12,7 +14,8 @@ export interface RuleDiagnostic {
 
 export interface Rule {
   id: string;
-  analyze(sourceText: string, filePath: string): RuleDiagnostic[];
+  /** Pass a pre-parsed `sharedSf` from the caller to avoid redundant Project creation. */
+  analyze(sourceText: string, filePath: string, sharedSf?: SourceFile): RuleDiagnostic[];
 }
 
 export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH';

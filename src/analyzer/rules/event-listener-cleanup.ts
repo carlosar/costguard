@@ -7,21 +7,22 @@
  * event and the component can never be garbage-collected.
  */
 
-import { Project, SyntaxKind } from 'ts-morph';
+import { Project, SourceFile, SyntaxKind } from 'ts-morph';
 import { Rule, RuleDiagnostic } from '../types';
 
 export const eventListenerCleanupRule: Rule = {
   id: 'FCG007',
 
-  analyze(sourceText: string, filePath: string): RuleDiagnostic[] {
+  analyze(sourceText: string, filePath: string, sharedSf?: SourceFile): RuleDiagnostic[] {
     if (!sourceText.includes('addEventListener')) return [];
 
-    const project = new Project({
-      useInMemoryFileSystem: true,
-      skipFileDependencyResolution: true,
-      compilerOptions: { allowJs: true, jsx: 4 }
-    });
-    const sf = project.createSourceFile(filePath.replace(/\\/g, '/'), sourceText);
+    let sf: SourceFile;
+    if (sharedSf) {
+      sf = sharedSf;
+    } else {
+      const project = new Project({ useInMemoryFileSystem: true, skipFileDependencyResolution: true, compilerOptions: { allowJs: true, jsx: 4 } });
+      sf = project.createSourceFile(filePath.replace(/\\/g, '/'), sourceText);
+    }
     const diagnostics: RuleDiagnostic[] = [];
 
     sf.getDescendantsOfKind(SyntaxKind.CallExpression).forEach(call => {

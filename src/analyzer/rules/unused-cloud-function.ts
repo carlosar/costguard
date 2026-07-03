@@ -17,7 +17,7 @@
  *   exports.myFn     = onRequest((req, res) => { ... });  // ← also deployed
  */
 
-import { Project, SyntaxKind } from 'ts-morph';
+import { Project, SourceFile, SyntaxKind } from 'ts-morph';
 import { Rule, RuleDiagnostic } from '../types';
 
 // v2 modular SDK function factories (top-level imports from firebase-functions/v2/*)
@@ -56,7 +56,7 @@ function isCloudFunctionFactory(initText: string): boolean {
 export const unusedCloudFunctionRule: Rule = {
   id: 'FCG016',
 
-  analyze(sourceText: string, filePath: string): RuleDiagnostic[] {
+  analyze(sourceText: string, filePath: string, sharedSf?: SourceFile): RuleDiagnostic[] {
     // Only fire on Firebase Functions files
     const pathLower = filePath.replace(/\\/g, '/').toLowerCase();
     const isFunctionsFile =
@@ -69,12 +69,13 @@ export const unusedCloudFunctionRule: Rule = {
 
     if (!isFunctionsFile && !hasFunctionsImport) return [];
 
-    const project = new Project({
-      useInMemoryFileSystem: true,
-      skipFileDependencyResolution: true,
-      compilerOptions: { allowJs: true, jsx: 4 }
-    });
-    const sf = project.createSourceFile(filePath.replace(/\\/g, '/'), sourceText);
+    let sf: SourceFile;
+    if (sharedSf) {
+      sf = sharedSf;
+    } else {
+      const project = new Project({ useInMemoryFileSystem: true, skipFileDependencyResolution: true, compilerOptions: { allowJs: true, jsx: 4 } });
+      sf = project.createSourceFile(filePath.replace(/\\/g, '/'), sourceText);
+    }
     const diagnostics: RuleDiagnostic[] = [];
 
     // Collect all names assigned to exports.xxx = ... (v1 compat style)

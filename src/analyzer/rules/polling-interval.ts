@@ -12,7 +12,7 @@
  * function poll() { getDocs(...).then(() => setTimeout(poll, N)); }
  */
 
-import { Project, SyntaxKind } from 'ts-morph';
+import { Project, SourceFile, SyntaxKind } from 'ts-morph';
 import { Rule, RuleDiagnostic } from '../types';
 
 const FIRESTORE_READ_RE = /\b(getDoc|getDocs)\s*[<(]/;
@@ -20,16 +20,17 @@ const FIRESTORE_READ_RE = /\b(getDoc|getDocs)\s*[<(]/;
 export const pollingIntervalRule: Rule = {
   id: 'FCG013',
 
-  analyze(sourceText: string, filePath: string): RuleDiagnostic[] {
+  analyze(sourceText: string, filePath: string, sharedSf?: SourceFile): RuleDiagnostic[] {
     if (!sourceText.includes('setInterval') && !sourceText.includes('setTimeout')) return [];
     if (!FIRESTORE_READ_RE.test(sourceText)) return [];
 
-    const project = new Project({
-      useInMemoryFileSystem: true,
-      skipFileDependencyResolution: true,
-      compilerOptions: { allowJs: true, jsx: 4 }
-    });
-    const sf = project.createSourceFile(filePath.replace(/\\/g, '/'), sourceText);
+    let sf: SourceFile;
+    if (sharedSf) {
+      sf = sharedSf;
+    } else {
+      const project = new Project({ useInMemoryFileSystem: true, skipFileDependencyResolution: true, compilerOptions: { allowJs: true, jsx: 4 } });
+      sf = project.createSourceFile(filePath.replace(/\\/g, '/'), sourceText);
+    }
     const diagnostics: RuleDiagnostic[] = [];
 
     sf.getDescendantsOfKind(SyntaxKind.CallExpression).forEach(call => {

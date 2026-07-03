@@ -37,8 +37,7 @@ function getStagedFiles(): string[] {
     return out.split('\n')
       .map(f => f.trim())
       .filter(f => f && SUPPORTED_EXTS.has(path.extname(f)))
-      .map(f => path.resolve(cwd, f))
-      .filter(f => fs.existsSync(f));
+      .map(f => path.resolve(cwd, f));
   } catch {
     return [];
   }
@@ -68,7 +67,14 @@ function main() {
     if (arg === '--staged')            staged     = true;
     else if (arg === '--json')         jsonMode   = true;
     else if (arg === '--format=github') githubMode = true;
-    else if (arg.startsWith('--max-risk=')) maxRisk = arg.split('=')[1] as RiskLevel;
+    else if (arg.startsWith('--max-risk=')) {
+      const val = arg.split('=')[1].toUpperCase() as RiskLevel;
+      if (!Object.prototype.hasOwnProperty.call(RISK_ORDER, val)) {
+        console.error(`CostGuard: invalid --max-risk value "${arg.split('=')[1]}". Must be LOW, MEDIUM, or HIGH.`);
+        process.exit(1);
+      }
+      maxRisk = val;
+    }
     else targets.push(...collectFiles(arg));
   }
 
@@ -94,7 +100,14 @@ function main() {
 
   for (const file of files) {
     let source: string;
-    try { source = fs.readFileSync(file, 'utf8'); } catch { continue; }
+    try {
+      if (staged) {
+        const rel = path.relative(cwd, file).replace(/\\/g, '/');
+        source = execSync(`git show ":${rel}"`, { encoding: 'utf8' });
+      } else {
+        source = fs.readFileSync(file, 'utf8');
+      }
+    } catch { continue; }
 
     const findings = analyzeFile(source, file);
     if (findings.length === 0) continue;

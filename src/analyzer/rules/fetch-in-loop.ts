@@ -14,7 +14,7 @@
  * async batch, or use a bulk/batch endpoint if the service provides one.
  */
 
-import { Project, SyntaxKind } from 'ts-morph';
+import { Project, SourceFile, SyntaxKind } from 'ts-morph';
 import { Rule, RuleDiagnostic } from '../types';
 
 const AXIOS_METHODS = new Set(['get', 'post', 'put', 'patch', 'delete', 'request', 'head']);
@@ -43,15 +43,16 @@ function isFetchOrAxios(exprText: string): boolean {
 export const fetchInLoopRule: Rule = {
   id: 'FCG008',
 
-  analyze(sourceText: string, filePath: string): RuleDiagnostic[] {
+  analyze(sourceText: string, filePath: string, sharedSf?: SourceFile): RuleDiagnostic[] {
     if (!sourceText.includes('fetch') && !sourceText.includes('axios')) return [];
 
-    const project = new Project({
-      useInMemoryFileSystem: true,
-      skipFileDependencyResolution: true,
-      compilerOptions: { allowJs: true, jsx: 4 }
-    });
-    const sf = project.createSourceFile(filePath.replace(/\\/g, '/'), sourceText);
+    let sf: SourceFile;
+    if (sharedSf) {
+      sf = sharedSf;
+    } else {
+      const project = new Project({ useInMemoryFileSystem: true, skipFileDependencyResolution: true, compilerOptions: { allowJs: true, jsx: 4 } });
+      sf = project.createSourceFile(filePath.replace(/\\/g, '/'), sourceText);
+    }
     const diagnostics: RuleDiagnostic[] = [];
 
     sf.getDescendantsOfKind(SyntaxKind.CallExpression).forEach(call => {

@@ -60,19 +60,20 @@ function isDirectlyInComponentRender(call: Node): boolean {
 export const readInRenderRule: Rule = {
   id: 'FCG009',
 
-  analyze(sourceText: string, filePath: string): RuleDiagnostic[] {
+  analyze(sourceText: string, filePath: string, sharedSf?: SourceFile): RuleDiagnostic[] {
     if (
       !sourceText.includes('getDoc') &&
       !sourceText.includes('getDocs') &&
       !sourceText.includes('httpsCallable')
     ) return [];
 
-    const project = new Project({
-      useInMemoryFileSystem: true,
-      skipFileDependencyResolution: true,
-      compilerOptions: { allowJs: true, jsx: 4 }
-    });
-    const sf = project.createSourceFile(filePath.replace(/\\/g, '/'), sourceText);
+    let sf: SourceFile;
+    if (sharedSf) {
+      sf = sharedSf;
+    } else {
+      const project = new Project({ useInMemoryFileSystem: true, skipFileDependencyResolution: true, compilerOptions: { allowJs: true, jsx: 4 } });
+      sf = project.createSourceFile(filePath.replace(/\\/g, '/'), sourceText);
+    }
     const callableNames = findCallableNames(sf);
     const diagnostics: RuleDiagnostic[] = [];
 

@@ -55,16 +55,17 @@ const DEBOUNCE_RE = /\b(debounce|throttle)\s*\(/;
 export const highFreqHandlerRule: Rule = {
   id: 'FCG011',
 
-  analyze(sourceText: string, filePath: string): RuleDiagnostic[] {
+  analyze(sourceText: string, filePath: string, sharedSf?: SourceFile): RuleDiagnostic[] {
     const hasExpensive = EXPENSIVE_OP_RE.test(sourceText) || sourceText.includes('httpsCallable');
     if (!hasExpensive) return [];
 
-    const project = new Project({
-      useInMemoryFileSystem: true,
-      skipFileDependencyResolution: true,
-      compilerOptions: { allowJs: true, jsx: 4 }
-    });
-    const sf = project.createSourceFile(filePath.replace(/\\/g, '/'), sourceText);
+    let sf: SourceFile;
+    if (sharedSf) {
+      sf = sharedSf;
+    } else {
+      const project = new Project({ useInMemoryFileSystem: true, skipFileDependencyResolution: true, compilerOptions: { allowJs: true, jsx: 4 } });
+      sf = project.createSourceFile(filePath.replace(/\\/g, '/'), sourceText);
+    }
     const callableNames = findCallableNames(sf);
     const diagnostics: RuleDiagnostic[] = [];
 

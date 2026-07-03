@@ -10,7 +10,7 @@
  * (up to 500 operations per batch commit).
  */
 
-import { Project, SyntaxKind } from 'ts-morph';
+import { Project, SourceFile, SyntaxKind } from 'ts-morph';
 import { Rule, RuleDiagnostic } from '../types';
 
 // Modular SDK — specific enough to flag unconditionally
@@ -47,7 +47,7 @@ function isFirestoreCompatWrite(exprText: string, methodName: string): boolean {
 export const writeInLoopRule: Rule = {
   id: 'FCG012',
 
-  analyze(sourceText: string, filePath: string): RuleDiagnostic[] {
+  analyze(sourceText: string, filePath: string, sharedSf?: SourceFile): RuleDiagnostic[] {
     if (
       !sourceText.includes('Doc') &&
       !sourceText.includes('.add(') &&
@@ -56,12 +56,13 @@ export const writeInLoopRule: Rule = {
       !sourceText.includes('.delete(')
     ) return [];
 
-    const project = new Project({
-      useInMemoryFileSystem: true,
-      skipFileDependencyResolution: true,
-      compilerOptions: { allowJs: true, jsx: 4 }
-    });
-    const sf = project.createSourceFile(filePath.replace(/\\/g, '/'), sourceText);
+    let sf: SourceFile;
+    if (sharedSf) {
+      sf = sharedSf;
+    } else {
+      const project = new Project({ useInMemoryFileSystem: true, skipFileDependencyResolution: true, compilerOptions: { allowJs: true, jsx: 4 } });
+      sf = project.createSourceFile(filePath.replace(/\\/g, '/'), sourceText);
+    }
     const diagnostics: RuleDiagnostic[] = [];
 
     sf.getDescendantsOfKind(SyntaxKind.CallExpression).forEach(call => {

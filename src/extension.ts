@@ -105,6 +105,7 @@ function highestLevel(score: RiskScore): RiskLevel {
 // ── Core analysis ─────────────────────────────────────────────────────────────
 
 function analyzeDoc(doc: vscode.TextDocument, source?: 'open' | 'save'): void {
+  if (doc.uri.scheme !== 'file') return;
   if (!SUPPORTED.has(doc.languageId)) return;
 
   const enabled = vscode.workspace.getConfiguration('costGuard').get<boolean>('enable', true);
@@ -209,7 +210,7 @@ function hasAnyProtection(workspaceRoot: string): boolean {
 
 export function activate(context: vscode.ExtensionContext): void {
   const telemetry = initTelemetry();
-  context.subscriptions.push(telemetry);
+  if (telemetry) context.subscriptions.push(telemetry);
   trackEvent('extension.activated', { version: context.extension.packageJSON.version as string });
 
   diagnosticCollection = vscode.languages.createDiagnosticCollection('costguard');
@@ -283,36 +284,24 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
-  // Detect new installs / upgrades by comparing stored version to current
+  // Detect new installs / major upgrades by comparing stored version to current
   const currentVersion = context.extension.packageJSON.version as string;
   const lastVersion    = context.globalState.get<string>('costguard.lastVersion', '');
-  const isNewVersion   = lastVersion !== currentVersion;
+  const isMajorBump    = lastVersion.split('.')[0] !== currentVersion.split('.')[0];
 
   // Persist the current version (async write — not read again below)
-  if (isNewVersion) {
+  if (lastVersion !== currentVersion) {
     context.globalState.update('costguard.lastVersion', currentVersion);
   }
 
-  // Derive wizard flags without relying on the async update above having resolved
+  // Only reset wizard flags on major version changes so "Later" stays durable across
+  // patch/minor updates and same-version reinstalls.
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  let setupComplete  = isNewVersion ? false : context.globalState.get<boolean>('costguard.setupComplete',  false);
-  let setupDismissed = isNewVersion ? false : context.globalState.get<boolean>('costguard.setupDismissed', false);
-
-  // VS Code persists globalState through same-version reinstalls, so stale
-  // setupComplete/setupDismissed flags would silently suppress the wizard.
-  // Reset whichever flags are set whenever no protection layer is installed.
-  const protection = workspaceRoot ? hasAnyProtection(workspaceRoot) : false;
-  console.log(`[CostGuard] workspaceRoot=${workspaceRoot} protection=${protection} setupComplete=${setupComplete} setupDismissed=${setupDismissed}`);
-  if (workspaceRoot && !protection) {
-    if (setupComplete)  { setupComplete  = false; context.globalState.update('costguard.setupComplete',  false); }
-    if (setupDismissed) { setupDismissed = false; context.globalState.update('costguard.setupDismissed', false); }
-  }
-
-  console.log(`[CostGuard] after reset: setupComplete=${setupComplete} setupDismissed=${setupDismissed} → showBanner=${!setupComplete && !setupDismissed}`);
+  const setupComplete  = isMajorBump ? false : context.globalState.get<boolean>('costguard.setupComplete',  false);
+  const setupDismissed = isMajorBump ? false : context.globalState.get<boolean>('costguard.setupDismissed', false);
 
   if (!setupComplete && !setupDismissed) {
     const showBanner = () => {
-      console.log('[CostGuard] showBanner firing');
       vscode.window.showInformationMessage(
         'CostGuard installed — configure your protection layers (pre-commit, GitHub Actions, deploy gate)',
         'Set Up Now',

@@ -6,7 +6,6 @@ node_modules/**
 .husky/**
 costguard/**
 scripts/**
-templates/**
 .gitignore
 .npmignore
 .releaserc.json

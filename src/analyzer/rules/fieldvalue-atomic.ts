@@ -21,7 +21,7 @@
  *   await updateDoc(ref, { count: data.count + 1 });  ← use increment(1)
  */
 
-import { Project, SyntaxKind } from 'ts-morph';
+import { Project, SourceFile, SyntaxKind } from 'ts-morph';
 import { Rule, RuleDiagnostic } from '../types';
 
 const WRITE_CALLS = new Set(['setDoc', 'updateDoc', 'addDoc']);
@@ -32,19 +32,20 @@ const ALREADY_ATOMIC_RE = /\b(arrayUnion|arrayRemove|increment|serverTimestamp|d
 export const fieldValueAtomicRule: Rule = {
   id: 'FCG015',
 
-  analyze(sourceText: string, filePath: string): RuleDiagnostic[] {
+  analyze(sourceText: string, filePath: string, sharedSf?: SourceFile): RuleDiagnostic[] {
     // Fast exit: needs both a doc read and a mutation pattern
     const hasRead = sourceText.includes('getDoc') || sourceText.includes('.data()');
     const hasArrayMutation = sourceText.includes('.push(') || sourceText.includes('.concat(') || sourceText.includes('.splice(');
     const hasCounterMutation = /\+= *1\b/.test(sourceText) || /\+\+/.test(sourceText) || /--/.test(sourceText);
     if (!hasRead || (!hasArrayMutation && !hasCounterMutation)) return [];
 
-    const project = new Project({
-      useInMemoryFileSystem: true,
-      skipFileDependencyResolution: true,
-      compilerOptions: { allowJs: true, jsx: 4 }
-    });
-    const sf = project.createSourceFile(filePath.replace(/\\/g, '/'), sourceText);
+    let sf: SourceFile;
+    if (sharedSf) {
+      sf = sharedSf;
+    } else {
+      const project = new Project({ useInMemoryFileSystem: true, skipFileDependencyResolution: true, compilerOptions: { allowJs: true, jsx: 4 } });
+      sf = project.createSourceFile(filePath.replace(/\\/g, '/'), sourceText);
+    }
     const diagnostics: RuleDiagnostic[] = [];
 
     sf.getDescendantsOfKind(SyntaxKind.CallExpression).forEach(call => {

@@ -16,7 +16,7 @@
  *   const snap = await getDocs(q);
  */
 
-import { Project, SyntaxKind } from 'ts-morph';
+import { Project, SourceFile, SyntaxKind } from 'ts-morph';
 import { Rule, RuleDiagnostic } from '../types';
 
 const CLIENT_FILTER_METHODS = new Set(['filter', 'find', 'some', 'every', 'reduce']);
@@ -24,18 +24,19 @@ const CLIENT_FILTER_METHODS = new Set(['filter', 'find', 'some', 'every', 'reduc
 export const clientSideFilterRule: Rule = {
   id: 'FCG014',
 
-  analyze(sourceText: string, filePath: string): RuleDiagnostic[] {
+  analyze(sourceText: string, filePath: string, sharedSf?: SourceFile): RuleDiagnostic[] {
     if (!sourceText.includes('getDocs') && !sourceText.includes('.get(')) return [];
     if (!sourceText.includes('.filter(') && !sourceText.includes('.find(') &&
         !sourceText.includes('.some(')   && !sourceText.includes('.every(') &&
         !sourceText.includes('.reduce(')) return [];
 
-    const project = new Project({
-      useInMemoryFileSystem: true,
-      skipFileDependencyResolution: true,
-      compilerOptions: { allowJs: true, jsx: 4 }
-    });
-    const sf = project.createSourceFile(filePath.replace(/\\/g, '/'), sourceText);
+    let sf: SourceFile;
+    if (sharedSf) {
+      sf = sharedSf;
+    } else {
+      const project = new Project({ useInMemoryFileSystem: true, skipFileDependencyResolution: true, compilerOptions: { allowJs: true, jsx: 4 } });
+      sf = project.createSourceFile(filePath.replace(/\\/g, '/'), sourceText);
+    }
     const diagnostics: RuleDiagnostic[] = [];
 
     // Step 1 — collect variable names assigned from unbounded collection reads

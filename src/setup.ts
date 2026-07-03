@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs   from 'fs';
 import * as path from 'path';
 import * as os   from 'os';
+import { execSync } from 'child_process';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -11,11 +12,6 @@ interface FeatureItem extends vscode.QuickPickItem {
 
 // ── Path helpers ──────────────────────────────────────────────────────────────
 
-/** Convert Windows backslashes so paths work inside Git Bash hook scripts. */
-function unixPath(p: string): string {
-  return p.replace(/\\/g, '/');
-}
-
 export function findGitRoot(dir: string): string | null {
   if (fs.existsSync(path.join(dir, '.git'))) return dir;
   const parent = path.dirname(dir);
@@ -24,8 +20,26 @@ export function findGitRoot(dir: string): string | null {
 
 // ── Feature installers ────────────────────────────────────────────────────────
 
-function installPreCommitHook(gitRoot: string, cliPath: string): void {
-  const hooksDir = path.join(gitRoot, '.git', 'hooks');
+function installPreCommitHook(gitRoot: string): void {
+  // Respect core.hooksPath (e.g. husky sets this to .husky/)
+  let hooksDir: string;
+  try {
+    const custom = execSync('git config core.hooksPath', { cwd: gitRoot, encoding: 'utf8' }).trim();
+    if (custom) {
+      hooksDir = path.isAbsolute(custom) ? custom : path.resolve(gitRoot, custom);
+      if (!fs.existsSync(hooksDir)) {
+        vscode.window.showWarningMessage(
+          `CostGuard: core.hooksPath is "${custom}" but that directory doesn't exist. Pre-commit hook skipped.`,
+        );
+        return;
+      }
+    } else {
+      hooksDir = path.join(gitRoot, '.git', 'hooks');
+    }
+  } catch {
+    hooksDir = path.join(gitRoot, '.git', 'hooks');
+  }
+
   const hookFile = path.join(hooksDir, 'pre-commit');
 
   if (!fs.existsSync(hooksDir)) fs.mkdirSync(hooksDir, { recursive: true });
@@ -33,7 +47,7 @@ function installPreCommitHook(gitRoot: string, cliPath: string): void {
   const script = [
     '#!/bin/sh',
     '# CostGuard pre-commit hook — remove this block to disable',
-    `node "${unixPath(cliPath)}" --staged --max-risk=HIGH`,
+    'npx costguard --staged --max-risk=HIGH',
     '',
   ].join('\n');
 
@@ -114,8 +128,6 @@ export async function runSetupWizard(
     return;
   }
 
-  const cliPath = path.join(context.extensionPath, 'out', 'cli.js');
-
   const features: FeatureItem[] = [
     {
       id:          'precommit',
@@ -134,8 +146,8 @@ export async function runSetupWizard(
     {
       id:          'deploy',
       label:       '$(rocket)  Deploy Gate',
-      description: 'Block firebase deploy / npm run deploy on MEDIUM+ risk',
-      detail:      'Adds a predeploy script to your package.json — runs before every deploy',
+      description: 'Block npm run deploy on MEDIUM+ risk (adds predeploy to package.json)',
+      detail:      'Adds a predeploy script to your package.json — runs before npm run deploy (not firebase deploy directly)',
       picked:      false,
     },
   ];
@@ -166,7 +178,7 @@ export async function runSetupWizard(
     const gitRoot = findGitRoot(workspaceRoot);
     if (gitRoot) {
       try {
-        installPreCommitHook(gitRoot, cliPath);
+        installPreCommitHook(gitRoot);
         done.push('pre-commit hook');
       } catch (e: unknown) {
         skipped.push(`pre-commit hook (${(e as Error).message})`);
