@@ -1,3 +1,10 @@
+## [0.5.4](https://github.com/carlosar/costguard/compare/v0.5.3...v0.5.4) (2026-07-03)
+
+
+### Bug Fixes
+
+* address 11 confirmed QA audit findings ([88203ef](https://github.com/carlosar/costguard/commit/88203ef0fd0905e4e66245ad9b065a1021c7cee0))
+
 ## [0.5.3](https://github.com/carlosar/costguard/compare/v0.5.2...v0.5.3) (2026-06-29)
 
 
