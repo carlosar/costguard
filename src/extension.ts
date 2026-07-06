@@ -4,7 +4,8 @@ import * as path from 'path';
 import { analyzeFile } from './analyzer';
 import { computeRiskScore } from './analyzer/scorer';
 import { RiskScore, RiskLevel } from './analyzer/types';
-import { runSetupWizard, findGitRoot } from './setup';
+import { runSetupWizard } from './setup';
+import { findGitRoot, resolveHooksDir } from './setup-helpers';
 import { generateReport } from './reporter';
 import { initTelemetry, trackEvent, disposeTelemetry } from './telemetry';
 
@@ -191,7 +192,8 @@ function hasAnyProtection(workspaceRoot: string): boolean {
   if (fs.existsSync(path.join(workspaceRoot, '.github', 'workflows', 'costguard.yml'))) return true;
   const gitRoot = findGitRoot(workspaceRoot);
   if (gitRoot) {
-    const hookFile = path.join(gitRoot, '.git', 'hooks', 'pre-commit');
+    // Same hook location the wizard installs to (respects core.hooksPath/husky)
+    const hookFile = path.join(resolveHooksDir(gitRoot).dir, 'pre-commit');
     try {
       if (fs.existsSync(hookFile) && fs.readFileSync(hookFile, 'utf8').includes('CostGuard')) return true;
     } catch {}
@@ -203,6 +205,10 @@ function hasAnyProtection(workspaceRoot: string): boolean {
       if (pkg.scripts?.predeploy?.includes('costguard')) return true;
     } catch {}
   }
+  const fbFile = path.join(workspaceRoot, 'firebase.json');
+  try {
+    if (fs.existsSync(fbFile) && fs.readFileSync(fbFile, 'utf8').includes('costguard')) return true;
+  } catch {}
   return false;
 }
 
@@ -272,12 +278,12 @@ export function activate(context: vscode.ExtensionContext): void {
       }
       await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: 'CostGuard: Scanning and generating report…' },
-        async () => {
-          const reportPath = generateReport(workspaceRoot);
+        async (progress) => {
+          const reportPath = await generateReport(workspaceRoot, progress);
           const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(reportPath));
           await vscode.window.showTextDocument(doc);
           vscode.window.showInformationMessage(
-            `CostGuard: Report saved to costguard/${require('path').basename(reportPath)}`
+            `CostGuard: Report saved to costguard/${path.basename(reportPath)}`
           );
         }
       );
@@ -313,7 +319,12 @@ export function activate(context: vscode.ExtensionContext): void {
     };
 
     if (vscode.workspace.workspaceFolders?.length) {
-      setTimeout(showBanner, 3000);
+      if (workspaceRoot && hasAnyProtection(workspaceRoot)) {
+        // Repo is already protected (e.g. a teammate ran the wizard) — nothing to set up
+        context.globalState.update('costguard.setupComplete', true);
+      } else {
+        setTimeout(showBanner, 3000);
+      }
     } else {
       // No workspace at activation — defer until one is open so we can check
       // whether protection files exist before deciding to show the banner.

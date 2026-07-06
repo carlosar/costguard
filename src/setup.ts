@@ -2,7 +2,9 @@ import * as vscode from 'vscode';
 import * as fs   from 'fs';
 import * as path from 'path';
 import * as os   from 'os';
-import { execSync } from 'child_process';
+import { findGitRoot, resolveHooksDir, detectIndent, addFirebasePredeploy, FIREBASE_PREDEPLOY_CMD } from './setup-helpers';
+
+export { findGitRoot } from './setup-helpers';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -10,34 +12,16 @@ interface FeatureItem extends vscode.QuickPickItem {
   id: string;
 }
 
-// ── Path helpers ──────────────────────────────────────────────────────────────
-
-export function findGitRoot(dir: string): string | null {
-  if (fs.existsSync(path.join(dir, '.git'))) return dir;
-  const parent = path.dirname(dir);
-  return parent === dir ? null : findGitRoot(parent);
-}
-
 // ── Feature installers ────────────────────────────────────────────────────────
 
 function installPreCommitHook(gitRoot: string): void {
   // Respect core.hooksPath (e.g. husky sets this to .husky/)
-  let hooksDir: string;
-  try {
-    const custom = execSync('git config core.hooksPath', { cwd: gitRoot, encoding: 'utf8' }).trim();
-    if (custom) {
-      hooksDir = path.isAbsolute(custom) ? custom : path.resolve(gitRoot, custom);
-      if (!fs.existsSync(hooksDir)) {
-        vscode.window.showWarningMessage(
-          `CostGuard: core.hooksPath is "${custom}" but that directory doesn't exist. Pre-commit hook skipped.`,
-        );
-        return;
-      }
-    } else {
-      hooksDir = path.join(gitRoot, '.git', 'hooks');
-    }
-  } catch {
-    hooksDir = path.join(gitRoot, '.git', 'hooks');
+  const { dir: hooksDir, custom } = resolveHooksDir(gitRoot);
+  if (custom && !fs.existsSync(hooksDir)) {
+    vscode.window.showWarningMessage(
+      `CostGuard: core.hooksPath is "${custom}" but that directory doesn't exist. Pre-commit hook skipped.`,
+    );
+    return;
   }
 
   const hookFile = path.join(hooksDir, 'pre-commit');
@@ -47,7 +31,7 @@ function installPreCommitHook(gitRoot: string): void {
   const script = [
     '#!/bin/sh',
     '# CostGuard pre-commit hook — remove this block to disable',
-    'npx costguard --staged --max-risk=HIGH',
+    'npx --yes costguard --staged --max-risk=HIGH',
     '',
   ].join('\n');
 
@@ -88,28 +72,30 @@ function addCostguardDevDep(workspaceRoot: string): void {
 }
 
 function installDeployGate(workspaceRoot: string): void {
+  // Layer 1: npm predeploy script — gates `npm run deploy`
   const pkgFile = path.join(workspaceRoot, 'package.json');
-  if (!fs.existsSync(pkgFile)) return;
+  if (fs.existsSync(pkgFile)) {
+    const raw = fs.readFileSync(pkgFile, 'utf8');
+    const pkg = JSON.parse(raw);
 
-  const raw = fs.readFileSync(pkgFile, 'utf8');
-  const pkg = JSON.parse(raw);
+    if (!pkg.scripts?.predeploy?.includes('costguard')) {
+      // Use the project's own costguard devDependency (via npx) rather than the
+      // locally-installed extension's path — predeploy ships in package.json and
+      // must work on any machine/CI runner, not just the one that ran the wizard.
+      pkg.scripts          = pkg.scripts ?? {};
+      pkg.scripts.predeploy = FIREBASE_PREDEPLOY_CMD;
 
-  if (pkg.scripts?.predeploy?.includes('costguard')) return;
+      fs.writeFileSync(pkgFile, JSON.stringify(pkg, null, detectIndent(raw)) + '\n');
+    }
+  }
 
-  // Use the project's own costguard devDependency (via npx) rather than the
-  // locally-installed extension's path — predeploy ships in package.json and
-  // must work on any machine/CI runner, not just the one that ran the wizard.
-  pkg.scripts          = pkg.scripts ?? {};
-  pkg.scripts.predeploy = 'npx costguard src/ --max-risk=MEDIUM';
-
-  fs.writeFileSync(pkgFile, JSON.stringify(pkg, null, detectIndent(raw)) + '\n');
-}
-
-/** Preserve the original indentation style of a JSON file. */
-function detectIndent(raw: string): number | string {
-  const m = raw.match(/^[\[{]\r?\n([ \t]+)/m);
-  if (!m) return 2;
-  return m[1].startsWith('\t') ? '\t' : m[1].length;
+  // Layer 2: firebase.json predeploy hooks — Firebase runs these on every
+  // `firebase deploy`, so the gate holds even when npm scripts are bypassed.
+  const fbFile = path.join(workspaceRoot, 'firebase.json');
+  if (fs.existsSync(fbFile)) {
+    const updated = addFirebasePredeploy(fs.readFileSync(fbFile, 'utf8'));
+    if (updated !== null) fs.writeFileSync(fbFile, updated);
+  }
 }
 
 // ── Wizard ────────────────────────────────────────────────────────────────────
@@ -133,7 +119,7 @@ export async function runSetupWizard(
       id:          'precommit',
       label:       '$(git-commit)  Pre-commit Hook',
       description: 'Block commits with HIGH risk violations',
-      detail:      'Writes a gate to .git/hooks/pre-commit — fires automatically on every git commit',
+      detail:      'Writes a gate to your git hooks directory (respects core.hooksPath / husky) — fires on every git commit',
       picked:      true,
     },
     {
@@ -146,8 +132,8 @@ export async function runSetupWizard(
     {
       id:          'deploy',
       label:       '$(rocket)  Deploy Gate',
-      description: 'Block npm run deploy on MEDIUM+ risk (adds predeploy to package.json)',
-      detail:      'Adds a predeploy script to your package.json — runs before npm run deploy (not firebase deploy directly)',
+      description: 'Block firebase deploy and npm run deploy on MEDIUM+ risk',
+      detail:      'Adds predeploy hooks to firebase.json (gates firebase deploy) and a predeploy script to package.json (gates npm run deploy)',
       picked:      false,
     },
   ];
@@ -188,11 +174,13 @@ export async function runSetupWizard(
     }
   }
 
-  if (ids.has('github') || ids.has('deploy')) {
+  if (ids.has('precommit') || ids.has('github') || ids.has('deploy')) {
     try {
+      // The pre-commit hook and predeploy scripts all invoke `npx costguard`;
+      // a local devDependency keeps that fast and offline-safe.
       addCostguardDevDep(workspaceRoot);
     } catch {
-      // non-fatal — predeploy/CI will still work if costguard is installed another way
+      // non-fatal — gates still work if costguard is installed another way
     }
   }
 

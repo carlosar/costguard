@@ -174,7 +174,7 @@ function main() {
   console.log(`  ${totalViolations} violation${totalViolations !== 1 ? 's' : ''} in ${results.length} file${results.length !== 1 ? 's' : ''}`);
 
   if (blocked) {
-    console.log(`\n  ✗  Blocked — fix HIGH risk violations before proceeding.\n`);
+    console.log(`\n  ✗  Blocked — fix violations at or above ${maxRisk} risk before proceeding.\n`);
   } else {
     console.log(`\n  ⚠  Warnings found (not blocking — below --max-risk threshold).\n`);
   }

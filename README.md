@@ -63,29 +63,34 @@ Three layers that stop risky code before it ships:
 |---|---|---|
 | Pre-commit hook | `git commit` | HIGH risk |
 | GitHub Actions PR gate | Every pull request | HIGH risk |
-| Deploy gate | `npm run predeploy` | MEDIUM+ risk |
+| Deploy gate | `firebase deploy` / `npm run deploy` | MEDIUM+ risk |
 
 ---
 
 ## Installation
 
-1. Download `costguard-0.2.0.vsix`
-2. Open VS Code → **Extensions** → `···` menu → **Install from VSIX**
-3. Select the file and reload when prompted
-4. The setup wizard appears automatically — choose which protection layers to enable
+**From the Marketplace (recommended):** open VS Code → **Extensions** → search for **CostGuard**, or run:
+
+```bash
+code --install-extension soarone.costguard
+```
+
+**From a VSIX** (offline installs): download the `.vsix` from the [GitHub releases page](https://github.com/carlosar/costguard/releases), then **Extensions** → `···` menu → **Install from VSIX**.
+
+After install, the setup prompt appears automatically — choose which protection layers to enable.
 
 ---
 
 ## Setup Wizard
 
-On first install (and on every upgrade), a QuickPick appears ~1.5 seconds after VS Code loads:
+On first install (and after major version upgrades), a notification appears a few seconds after VS Code loads. Click **Set Up Now** to open the protection-layer picker:
 
 ```
 CostGuard — Choose your protection layers
 
   ●  Pre-commit Hook         Block commits with HIGH risk violations
   ●  GitHub Actions PR Gate  Post risk card on PRs, block HIGH risk merges
-  ○  Deploy Gate             Block firebase deploy on MEDIUM+ risk violations
+  ○  Deploy Gate             Block firebase deploy / npm run deploy on MEDIUM+ risk
 ```
 
 Select what you want, press **Enter**. CostGuard writes all the necessary files automatically — no manual path setup.
@@ -370,7 +375,7 @@ Blocks `git commit` if staged files contain HIGH risk violations.
   ✗  Blocked — fix HIGH risk violations before proceeding.
 ```
 
-Installed automatically by the setup wizard into `.git/hooks/pre-commit`.
+Installed automatically by the setup wizard into your git hooks directory — `.git/hooks/pre-commit` by default, or wherever `core.hooksPath` points (so husky setups work too).
 
 ### GitHub Actions PR gate
 Runs on every pull request and posts a risk card comment. Fails the required check if HIGH risk violations are found, blocking the merge.
@@ -380,11 +385,17 @@ Runs on every pull request and posts a risk card comment. Fails the required che
 The workflow is written to `.github/workflows/costguard.yml` by the setup wizard. Requires `costguard` in `devDependencies` (added automatically).
 
 ### Deploy gate
-Runs before `firebase deploy` or any deploy script and blocks if MEDIUM+ risk violations are found.
+Blocks deploys when MEDIUM+ risk violations are found — wired in two places by the setup wizard:
+
+- **`firebase.json` predeploy hooks** — added to every deploy target present (hosting, functions, firestore, storage, database), so `firebase deploy` (and `firebase deploy --only <target>`) is gated directly.
+- **`package.json` predeploy script** — runs automatically before `npm run deploy`.
 
 ```bash
-npm run predeploy   # or wired via firebase.json predeploy hook
+firebase deploy      # gated via firebase.json predeploy hooks
+npm run deploy       # gated via the npm predeploy script
 ```
+
+If your project has no `firebase.json`, only the npm script gate is installed.
 
 ---
 
@@ -393,23 +404,26 @@ npm run predeploy   # or wired via firebase.json predeploy hook
 The analyzer is also available as a command-line tool for use in scripts and CI pipelines.
 
 ```bash
+# Install (or use npx without installing)
+npm install -D costguard
+
 # Scan a directory
-node out/cli.js src/
+npx costguard src/
 
 # Scan only staged files (for pre-commit hooks)
-node out/cli.js --staged
+npx costguard --staged
 
 # Output JSON for downstream tooling
-node out/cli.js src/ --json
+npx costguard src/ --json
 
 # GitHub Actions annotation format
-node out/cli.js src/ --format=github
+npx costguard src/ --format=github
 
 # Set the blocking threshold (default: HIGH)
-node out/cli.js src/ --max-risk=MEDIUM
+npx costguard src/ --max-risk=MEDIUM
 ```
 
-**Exit codes:** `0` = no violations above threshold · `1` = violations found
+**Exit codes:** `0` = no violations at or above the `--max-risk` threshold · `1` = violations at or above the threshold (or invalid arguments)
 
 ---
 
@@ -435,3 +449,5 @@ Toggle from **Settings** → search `costGuard`, or add to your workspace `setti
 |---|---|
 | `CostGuard: Setup` | Re-run the feature setup wizard |
 | `CostGuard: Show Risk Score Details` | Show full risk breakdown for the active file |
+| `CostGuard: Generate Report` | Scan the workspace and write a markdown report (with a copy-paste AI fix prompt) to `costguard/` |
+| `CostGuard: Copy Fix Prompt for AI` | Copy the selected violation + surrounding code as an AI-ready prompt (also on the lightbulb menu) |

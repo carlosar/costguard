@@ -40,15 +40,38 @@ jobs:
             try { report = JSON.parse(fs.readFileSync('costguard-report.json', 'utf8')); }
             catch { console.log('CostGuard: no report found.'); return; }
 
-            const { results, blocked } = report;
-
-            if (!results || results.length === 0) {
-              await github.rest.issues.createComment({
+            // Update the existing CostGuard comment instead of stacking a new one per push
+            const MARKER = '<!-- costguard-report -->';
+            async function upsertComment(body) {
+              body = `${MARKER}\n${body}`;
+              const { data: comments } = await github.rest.issues.listComments({
                 issue_number: context.issue.number,
                 owner: context.repo.owner,
                 repo:  context.repo.repo,
-                body:  '## ✅ CostGuard\n\nNo Firebase cost risks detected in changed files.',
+                per_page: 100,
               });
+              const existing = comments.find(c => c.body && c.body.includes(MARKER));
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  comment_id: existing.id,
+                  owner: context.repo.owner,
+                  repo:  context.repo.repo,
+                  body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo:  context.repo.repo,
+                  body,
+                });
+              }
+            }
+
+            const { results, blocked } = report;
+
+            if (!results || results.length === 0) {
+              await upsertComment('## ✅ CostGuard\n\nNo Firebase cost risks detected in changed files.');
               return;
             }
 
@@ -80,12 +103,7 @@ jobs:
               `## CostGuard Report\n\n${status}\n\n${table}\n` +
               `<details>\n<summary>Violation details</summary>\n\n${details}\n</details>`;
 
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo:  context.repo.repo,
-              body,
-            });
+            await upsertComment(body);
 
             if (blocked) {
               core.setFailed(`CostGuard: ${totalViolations} HIGH risk violation(s) found. Fix before merging.`);

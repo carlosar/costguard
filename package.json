@@ -68,6 +68,14 @@
         "title": "CostGuard: Copy Fix Prompt for AI"
       }
     ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "costGuard.resetSetup",
+          "when": "false"
+        }
+      ]
+    },
     "configuration": {
       "title": "CostGuard",
       "properties": {

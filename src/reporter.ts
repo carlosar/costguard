@@ -45,17 +45,29 @@ interface FileResult {
 
 // ── Report ────────────────────────────────────────────────────────────────────
 
-export function generateReport(workspaceRoot: string): string {
+export async function generateReport(
+  workspaceRoot: string,
+  progress?: { report(value: { message?: string }): void },
+): Promise<string> {
   const srcDir  = path.join(workspaceRoot, 'src');
   const scanDir = fs.existsSync(srcDir) ? srcDir : workspaceRoot;
 
   const results: FileResult[] = [];
+  const files   = collectFiles(scanDir);
+  let   scanned = 0;
 
-  for (const file of collectFiles(scanDir)) {
+  for (const file of files) {
     let source: string;
-    try { source = fs.readFileSync(file, 'utf8'); } catch { continue; }
+    try { source = await fs.promises.readFile(file, 'utf8'); } catch { continue; }
 
     const findings = analyzeFile(source, file);
+
+    // Yield to the event loop periodically so the extension host stays responsive
+    if (++scanned % 20 === 0) {
+      progress?.report({ message: `${scanned}/${files.length} files` });
+      await new Promise(resolve => setImmediate(resolve));
+    }
+
     if (findings.length === 0) continue;
 
     results.push({
