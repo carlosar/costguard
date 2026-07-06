@@ -1,3 +1,10 @@
+## [0.5.5](https://github.com/carlosar/costguard/compare/v0.5.4...v0.5.5) (2026-07-06)
+
+
+### Bug Fixes
+
+* gate firebase deploy via firebase.json hooks and align marketplace claims ([5872460](https://github.com/carlosar/costguard/commit/587246049cb2c04ed89cb7fe733a235e8671a194))
+
 ## [0.5.4](https://github.com/carlosar/costguard/compare/v0.5.3...v0.5.4) (2026-07-03)
 
 
