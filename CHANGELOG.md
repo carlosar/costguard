@@ -1,3 +1,10 @@
+## [0.5.6](https://github.com/carlosar/costguard/compare/v0.5.5...v0.5.6) (2026-07-07)
+
+
+### Bug Fixes
+
+* **fcg002:** detect modular v9 SDK reads (getDocs, collectionGroup) ([8f6f0df](https://github.com/carlosar/costguard/commit/8f6f0df26d88b53d1a15fca88236867c04e6080d))
+
 ## [0.5.5](https://github.com/carlosar/costguard/compare/v0.5.4...v0.5.5) (2026-07-06)
 
 
