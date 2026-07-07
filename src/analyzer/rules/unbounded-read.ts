@@ -13,7 +13,8 @@ import { Rule, RuleDiagnostic } from '../types';
 
 // Firestore query builders that indicate a collection-level read
 const COLLECTION_CALLS = new Set(['collection', 'collectionGroup']);
-const READ_TERMINATORS = new Set(['get', 'onSnapshot']);
+// v8/compat: .get() — modular v9: getDocs()/getDocsFromServer()/getDocsFromCache()
+const READ_TERMINATORS = new Set(['get', 'onSnapshot', 'getDocs', 'getDocsFromServer', 'getDocsFromCache']);
 
 function chainContainsLimit(callText: string): boolean {
   return /\.limit\s*\(/.test(callText) || /\blimit\s*\(/.test(callText);
@@ -46,10 +47,11 @@ export const unboundedReadRule: Rule = {
 
       const fullChain = call.getText();
 
-      // Only flag chains that involve a collection read
+      // Only flag chains that involve a collection read (collection/collectionGroup,
+      // as a method call or a standalone modular-SDK call)
       const involvesCollection = COLLECTION_CALLS.has(
         fullChain.match(/(\w+)\s*\(/)?.[1] ?? ''
-      ) || /\.collection\s*\(/.test(fullChain) || fullChain.includes('collection(');
+      ) || /\bcollection(Group)?\s*\(/.test(fullChain);
 
       if (!involvesCollection) return;
       if (isAggregateQuery(fullChain)) return;

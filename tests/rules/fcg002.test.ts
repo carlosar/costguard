@@ -26,6 +26,38 @@ describe('FCG002 — unbounded Firestore collection read', () => {
     expect(diags[0].code).toBe('FCG002');
   });
 
+  it('fires on getDocs(collection()) without limit (modular v9 SDK)', () => {
+    const src = `
+      async function loadAll() {
+        const snap = await getDocs(collection(db, 'invoices'));
+      }
+    `;
+    const diags = unboundedReadRule.analyze(src, FILE);
+    expect(diags.length).toBeGreaterThanOrEqual(1);
+    expect(diags[0].code).toBe('FCG002');
+  });
+
+  it('fires on getDocs(collectionGroup()) without limit', () => {
+    const src = `
+      async function loadAll() {
+        const snap = await getDocs(collectionGroup(db, 'reviews'));
+      }
+    `;
+    const diags = unboundedReadRule.analyze(src, FILE);
+    expect(diags.length).toBeGreaterThanOrEqual(1);
+    expect(diags[0].code).toBe('FCG002');
+  });
+
+  it('does not fire on getDocs(q) where the query is built elsewhere', () => {
+    const src = `
+      async function loadSome(q) {
+        const snap = await getDocs(q);
+      }
+    `;
+    const diags = unboundedReadRule.analyze(src, FILE);
+    expect(diags.filter(d => d.code === 'FCG002')).toHaveLength(0);
+  });
+
   it('fires on onSnapshot(collection()) without limit', () => {
     const src = `
       function subscribe() {
