@@ -321,6 +321,23 @@ await Promise.all(items.map(item => sendNotification(item)));
 
 ---
 
+## Suppressing a violation
+
+The rules are heuristics — when one flags code you've decided is fine, suppress it inline (ESLint-style). The suppression is honored everywhere: editor squiggles, the CLI, all three gates, and reports.
+
+```ts
+// costguard-disable-next-line FCG002
+const snap = await getDocs(collection(db, 'smallLookupTable'));
+
+const snap = await getDocs(collection(db, 'tiny')); // costguard-disable-line
+
+// costguard-disable-file FCG014   ← at top of file: suppress FCG014 in the whole file
+```
+
+Omit the rule codes to suppress every rule on that line (`// costguard-disable-next-line`). The quickest way to add one: click the lightbulb on any squiggle → **Suppress FCGxxx on this line**.
+
+---
+
 ## Risk scoring
 
 Each violation carries a point weight based on its real-world cost impact. Scores are capped at 100.

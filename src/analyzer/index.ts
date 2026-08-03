@@ -1,5 +1,6 @@
 import { Project } from 'ts-morph';
 import { RuleDiagnostic } from './types';
+import { applySuppressions } from './suppressions';
 import { unstableDepsRule } from './rules/unstable-deps';
 import { unboundedReadRule } from './rules/unbounded-read';
 import { listenerUiDepRule } from './rules/listener-ui-dep';
@@ -54,5 +55,7 @@ export function analyzeFile(sourceText: string, filePath: string): RuleDiagnosti
       // Never let a rule crash crash the extension
     }
   }
-  return results;
+  // Honor // costguard-disable-* comments last so every consumer
+  // (editor, CLI, gates, reports) sees the same filtered result.
+  return applySuppressions(sourceText, results);
 }

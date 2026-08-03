@@ -72,7 +72,7 @@ export async function generateReport(
 
     results.push({
       relPath:  path.relative(workspaceRoot, file).replace(/\\/g, '/'),
-      findings,
+      findings: [...findings].sort((a, b) => a.line - b.line),
       score:    computeRiskScore(findings),
     });
   }

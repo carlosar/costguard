@@ -95,7 +95,7 @@
     "typecheck": "tsc --noEmit -p ./",
     "watch": "node esbuild.config.js --watch",
     "vscode:prepublish": "node esbuild.config.js --minify",
-    "package": "vsce package --allow-missing-repository",
+    "package": "vsce package",
     "vscode:publish": "vsce publish",
     "setup-hooks": "node scripts/setup-hooks.js",
     "predeploy": "node out/cli.js src/ --max-risk=MEDIUM",

@@ -59,18 +59,35 @@ class CopyFixPromptActionProvider implements vscode.CodeActionProvider {
     _range: vscode.Range | vscode.Selection,
     context: vscode.CodeActionContext
   ): vscode.CodeAction[] {
-    return context.diagnostics
-      .filter(d => d.source === 'CostGuard')
-      .map(diagnostic => {
-        const action = new vscode.CodeAction('Copy fix prompt for AI', vscode.CodeActionKind.QuickFix);
-        action.diagnostics = [diagnostic];
-        action.command = {
-          command: 'costGuard.copyFixPrompt',
-          title: 'Copy fix prompt for AI',
-          arguments: [document.uri, diagnostic],
-        };
-        return action;
-      });
+    const actions: vscode.CodeAction[] = [];
+    for (const diagnostic of context.diagnostics) {
+      if (diagnostic.source !== 'CostGuard') continue;
+
+      const copy = new vscode.CodeAction('Copy fix prompt for AI', vscode.CodeActionKind.QuickFix);
+      copy.diagnostics = [diagnostic];
+      copy.command = {
+        command: 'costGuard.copyFixPrompt',
+        title: 'Copy fix prompt for AI',
+        arguments: [document.uri, diagnostic],
+      };
+      actions.push(copy);
+
+      const suppress = new vscode.CodeAction(
+        `Suppress ${diagnostic.code} on this line (costguard-disable-next-line)`,
+        vscode.CodeActionKind.QuickFix,
+      );
+      suppress.diagnostics = [diagnostic];
+      const line   = diagnostic.range.start.line;
+      const indent = document.lineAt(line).text.match(/^[ \t]*/)?.[0] ?? '';
+      suppress.edit = new vscode.WorkspaceEdit();
+      suppress.edit.insert(
+        document.uri,
+        new vscode.Position(line, 0),
+        `${indent}// costguard-disable-next-line ${diagnostic.code}\n`,
+      );
+      actions.push(suppress);
+    }
+    return actions;
   }
 }
 
