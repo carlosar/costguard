@@ -1,3 +1,10 @@
+# [0.6.0](https://github.com/carlosar/costguard/compare/v0.5.6...v0.6.0) (2026-08-05)
+
+
+### Features
+
+* inline suppression comments (costguard-disable-*) ([dc8ec73](https://github.com/carlosar/costguard/commit/dc8ec7389cda28b568fdd7de5d7c0d57ce3ea3a1))
+
 ## [0.5.6](https://github.com/carlosar/costguard/compare/v0.5.5...v0.5.6) (2026-07-07)
 
 
