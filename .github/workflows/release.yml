@@ -27,6 +27,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Fail before semantic-release publishes anything. vsce publish runs after
+      # npm publish and the git tag, so an expired PAT used to leave a partial
+      # release: live on npm, tagged in git, but never on the Marketplace.
+      - name: Verify Marketplace token
+        run: npx vsce verify-pat soarone --pat "$VSCE_PAT"
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
       - name: Release
         run: npx semantic-release
         env:
