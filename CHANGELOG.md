@@ -1,3 +1,10 @@
+# [0.7.0](https://github.com/carlosar/costguard/compare/v0.6.0...v0.7.0) (2026-09-24)
+
+
+### Features
+
+* add FCG018 (missing useEffect deps array); fix FCG013 resolver and FCG005 advice ([7f81266](https://github.com/carlosar/costguard/commit/7f812669b131f5b176e93f95692463d4c30e3a43))
+
 # [0.6.0](https://github.com/carlosar/costguard/compare/v0.5.6...v0.6.0) (2026-08-05)
 
 
