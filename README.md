@@ -319,6 +319,27 @@ for (const item of items) {
 await Promise.all(items.map(item => sendNotification(item)));
 ```
 
+### FCG018 — useEffect with no dependency array `error`
+`useEffect(() => { ... })` with the dependency array omitted re-runs after **every** render. If the body reads Firestore and the result updates state, that render re-runs the effect — an unbounded read loop that runs as fast as the browser can render. A missing `[]` is the single most common way a React app burns its daily read quota in minutes.
+
+```ts
+// Bad — no deps array: re-runs every render, setOrders causes another render
+useEffect(() => {
+  return onSnapshot(query(collection(db, 'orders'), limit(20)), snap => {
+    setOrders(snap.docs);        // ← FCG018
+  });
+});
+
+// Fix — [] runs it once on mount; list real dependencies if it has any
+useEffect(() => {
+  return onSnapshot(query(collection(db, 'orders'), limit(20)), snap => {
+    setOrders(snap.docs);
+  });
+}, []);
+```
+
+Only fires when the effect body does expensive work (Firestore read, listener, `fetch`/`axios`, or a callable). A no-deps effect that just sets `document.title` is left alone. FCG001 and FCG010 analyze the *contents* of a deps array and deliberately skip effects that have none, so this is a separate code you can suppress independently.
+
 ---
 
 ## Suppressing a violation
@@ -361,6 +382,7 @@ Each violation carries a point weight based on its real-world cost impact. Score
 | FCG015 Read-modify-write | Cost | 12 |
 | FCG016 Unexported Cloud Function | Cost + Scalability | 10 |
 | FCG017 Cloud Function in loop | Cost + Scalability | 25 |
+| FCG018 Missing useEffect deps array | Cost + Scalability | 30 |
 
 **Risk levels per category**
 

@@ -6,8 +6,12 @@
  * round-trip and counts as a separate billed read.  For N items this is N reads
  * instead of one — the classic N+1 problem.
  *
- * Fix: use getDocs() with an `in` query for up to 30 IDs, or collect IDs first
- * then call Promise.all(ids.map(id => getDoc(...))).
+ * Fix: use getDocs() with an `in` query for up to 30 IDs, or denormalize the
+ * fields you need into a single document.
+ *
+ * Note: Promise.all(ids.map(id => getDoc(...))) is deliberately NOT exempt.
+ * Running the reads in parallel lowers latency but bills exactly the same N
+ * reads, so the cost problem this rule exists to catch is unchanged.
  */
 
 import { Project, SourceFile, SyntaxKind } from 'ts-morph';
@@ -65,7 +69,7 @@ export const readInLoopRule: Rule = {
       const { line, column } = sf.getLineAndColumnAtPos(pos);
 
       diagnostics.push({
-        message: `[FCG005] ${methodName}() inside a loop causes N separate Firestore reads — one per iteration. Use an 'in' query (up to 30 IDs) or collect all IDs first and fetch in parallel with Promise.all() to reduce to a single billed operation.`,
+        message: `[FCG005] ${methodName}() inside a loop causes N separate Firestore reads — one per iteration. Fix: collapse them into a single query with an 'in' filter (up to 30 IDs per query), or denormalize the fields you need into one document. Wrapping the calls in Promise.all() only parallelizes them — you are still billed for all N reads.`,
         line: line - 1,
         startChar: column - 1,
         endChar: column - 1 + exprText.length,
