@@ -362,6 +362,23 @@ Covers v2 (`onDocumentWritten`/`onDocumentUpdated`, `onValueWritten`/`onValueUpd
 
 Two deliberate limits keep false positives down: **`onCreate`/`onDelete` triggers are never flagged**, because a write-back from those emits a *different* event type and terminates; and a handler that references `before` is treated as guarded, since a before/after comparison is the standard way to break the cycle.
 
+### FCG020 — Gemini API key reachable from the browser `error`
+The raw Gemini SDK (`@google/generative-ai`) authenticates with a plain API key. Ship it in client code and the key sits in your JavaScript bundle, where anyone can scrape it and bill inference to your project. Reported thefts have reached five figures within hours, and token-billed inference has no natural ceiling.
+
+```ts
+// Bad — NEXT_PUBLIC_/VITE_/REACT_APP_ are inlined into the browser bundle by design
+const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY); // ← FCG020
+
+// Fix — keep the key on the server
+export const ask = onCall(async (req) => {
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  return (await genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+    .generateContent(req.data.prompt)).response.text();
+});
+```
+
+**Two things this rule deliberately leaves alone.** `firebase/ai` (Firebase AI Logic) is *designed* for client use — it embeds no raw key and is protected by App Check, so flagging it would punish the pattern Firebase recommends. And `apiKey: 'AIza...'` inside a `firebaseConfig` object is [documented as not-a-secret](https://firebase.google.com/docs/projects/api-keys) and belongs in client code; flagging it would fire on virtually every Firebase app. This rule reacts only to a key handed to the AI SDK. Server-side use is untouched — a file importing `firebase-functions`/`firebase-admin` or defining `onCall`/`onRequest` is treated as backend.
+
 ---
 
 ## Suppressing a violation
@@ -406,6 +423,7 @@ Each violation carries a point weight based on its real-world cost impact. Score
 | FCG017 Cloud Function in loop | Cost + Scalability | 25 |
 | FCG018 Missing useEffect deps array | Cost + Scalability | 30 |
 | FCG019 Trigger writes to its own document | Cost + Scalability | 40 |
+| FCG020 Gemini API key in client code | Cost | 35 |
 
 **Risk levels per category**
 

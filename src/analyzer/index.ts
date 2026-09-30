@@ -20,6 +20,7 @@ import { unusedCloudFunctionRule } from './rules/unused-cloud-function';
 import { cloudfunctionInLoopRule } from './rules/cloudfunction-in-loop';
 import { missingDepsArrayRule } from './rules/missing-deps-array';
 import { triggerSelfWriteRule } from './rules/trigger-self-write';
+import { clientSideAiKeyRule } from './rules/client-side-ai-key';
 
 const ALL_RULES = [
   unstableDepsRule,           // FCG001: unstable useEffect deps (object/array/fn/call)
@@ -41,6 +42,7 @@ const ALL_RULES = [
   cloudfunctionInLoopRule,    // FCG017: httpsCallable invoked in a loop (N billed executions)
   missingDepsArrayRule,       // FCG018: useEffect with no deps array + expensive op
   triggerSelfWriteRule,       // FCG019: trigger writes back to its own document (infinite loop)
+  clientSideAiKeyRule,        // FCG020: Gemini API key reachable from the browser
 ];
 
 export function analyzeFile(sourceText: string, filePath: string): RuleDiagnostic[] {
