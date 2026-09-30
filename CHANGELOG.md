@@ -1,3 +1,12 @@
+# [0.8.0](https://github.com/carlosar/costguard/compare/v0.7.0...v0.8.0) (2026-09-30)
+
+
+### Features
+
+* add FCG019 — Cloud Function trigger writes back to its own document ([4f6ec53](https://github.com/carlosar/costguard/commit/4f6ec5322bcee97f4e977e3da82d679ed42a995e))
+* add FCG020 — Gemini API key reachable from the browser ([7aa47ab](https://github.com/carlosar/costguard/commit/7aa47ab1eb9b47a2b2392f4d346bffa22632a3ad))
+* add FCG021 and FCG022 — Realtime Database cost and leak coverage ([aada9a4](https://github.com/carlosar/costguard/commit/aada9a421aa6bd561c3e59b42d5069996601582e))
+
 # [0.7.0](https://github.com/carlosar/costguard/compare/v0.6.0...v0.7.0) (2026-09-24)
 
 
