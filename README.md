@@ -379,6 +379,42 @@ export const ask = onCall(async (req) => {
 
 **Two things this rule deliberately leaves alone.** `firebase/ai` (Firebase AI Logic) is *designed* for client use — it embeds no raw key and is protected by App Check, so flagging it would punish the pattern Firebase recommends. And `apiKey: 'AIza...'` inside a `firebaseConfig` object is [documented as not-a-secret](https://firebase.google.com/docs/projects/api-keys) and belongs in client code; flagging it would fire on virtually every Firebase app. This rule reacts only to a key handed to the AI SDK. Server-side use is untouched — a file importing `firebase-functions`/`firebase-admin` or defining `onCall`/`onRequest` is treated as backend.
 
+### FCG021 — Unbounded Realtime Database read `error` / `warning`
+Realtime Database bills by **bytes downloaded**, not per document. A listener without a limit ships the whole subtree on the first callback and again on every change; a listener at the root ships your entire database. Firebase names both in its [optimization guidance](https://firebase.google.com/docs/database/usage/optimize).
+
+```ts
+// Bad — the entire database, on every change (error)
+onValue(ref(db, '/'), cb);                          // ← FCG021
+
+// Bad — the whole list, forever (warning)
+onValue(ref(db, 'messages'), cb);                   // ← FCG021
+
+// Fix — bound it
+onValue(query(ref(db, 'messages'), limitToLast(50)), cb);
+```
+
+Covers the modular API (`onValue`, `onChildAdded`, `get`) and the compat API (`.on('value')`, `.once()`). `limitToFirst`/`limitToLast`/`equalTo` all satisfy it.
+
+Unlike Firestore, an RTDB path gives no syntactic clue whether it addresses one node or a list, so the rule reads the **last path segment**: a dynamic ending (`users/${uid}`) is a single node and is left alone, while a static ending (`messages`, `rooms/${id}/messages`) is treated as a list. A path that isn't a literal at all is skipped — a false negative is much cheaper than flagging every single-node read in a codebase.
+
+### FCG022 — Realtime Database listener without cleanup `error`
+The RTDB counterpart to FCG004. A listener opened in `useEffect` with no cleanup return survives unmount, so every remount stacks another listener on the same path — and each one re-downloads every subsequent change.
+
+```ts
+// Bad — never detached
+useEffect(() => {
+  onValue(query(ref(db, 'messages'), limitToLast(20)), cb);   // ← FCG022
+}, []);
+
+// Fix — return the unsubscribe
+useEffect(() => {
+  const unsub = onValue(query(ref(db, 'messages'), limitToLast(20)), cb);
+  return () => unsub();
+}, []);
+```
+
+Recognises both the modular unsubscribe and the compat `ref.off('value', cb)` form. FCG004 only knows Firestore's `onSnapshot`, so before this rule the entire RTDB surface leaked silently; they're separate codes so you can suppress them independently. The `.on(...)` check is keyed to RTDB event names, so an `EventEmitter` or socket is never mistaken for a database listener.
+
 ---
 
 ## Suppressing a violation
@@ -424,6 +460,8 @@ Each violation carries a point weight based on its real-world cost impact. Score
 | FCG018 Missing useEffect deps array | Cost + Scalability | 30 |
 | FCG019 Trigger writes to its own document | Cost + Scalability | 40 |
 | FCG020 Gemini API key in client code | Cost | 35 |
+| FCG021 Unbounded Realtime Database read | Cost + Scalability | 18 |
+| FCG022 RTDB listener without cleanup | Memory Leak | 20 |
 
 **Risk levels per category**
 

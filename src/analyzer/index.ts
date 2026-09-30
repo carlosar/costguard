@@ -21,6 +21,8 @@ import { cloudfunctionInLoopRule } from './rules/cloudfunction-in-loop';
 import { missingDepsArrayRule } from './rules/missing-deps-array';
 import { triggerSelfWriteRule } from './rules/trigger-self-write';
 import { clientSideAiKeyRule } from './rules/client-side-ai-key';
+import { rtdbUnboundedReadRule } from './rules/rtdb-unbounded-read';
+import { rtdbListenerCleanupRule } from './rules/rtdb-listener-cleanup';
 
 const ALL_RULES = [
   unstableDepsRule,           // FCG001: unstable useEffect deps (object/array/fn/call)
@@ -43,6 +45,8 @@ const ALL_RULES = [
   missingDepsArrayRule,       // FCG018: useEffect with no deps array + expensive op
   triggerSelfWriteRule,       // FCG019: trigger writes back to its own document (infinite loop)
   clientSideAiKeyRule,        // FCG020: Gemini API key reachable from the browser
+  rtdbUnboundedReadRule,      // FCG021: RTDB read with no limit / at the root
+  rtdbListenerCleanupRule,    // FCG022: RTDB listener without cleanup
 ];
 
 export function analyzeFile(sourceText: string, filePath: string): RuleDiagnostic[] {
