@@ -340,6 +340,28 @@ useEffect(() => {
 
 Only fires when the effect body does expensive work (Firestore read, listener, `fetch`/`axios`, or a callable). A no-deps effect that just sets `document.title` is left alone. FCG001 and FCG010 analyze the *contents* of a deps array and deliberately skip effects that have none, so this is a separate code you can suppress independently.
 
+### FCG019 — Cloud Function trigger writes to its own document `error`
+A Firestore or Realtime Database trigger that writes back to the document that fired it re-triggers itself. Every cycle bills a function invocation and a write, and nothing stops it — no user traffic required. This is the failure behind the widely-reported $72k overnight bill, and one of only two causes Firebase names explicitly in its [avoid surprise bills](https://firebase.google.com/docs/projects/billing/avoid-surprise-bills) guidance (FCG002 covers the other).
+
+```ts
+// Bad — the update re-fires this same trigger, forever
+export const touch = onDocumentWritten('users/{userId}', async (event) => {
+  await event.data.after.ref.update({ updatedAt: Date.now() });  // ← FCG019
+});
+
+// Fix — exit early when nothing you care about changed
+export const touch = onDocumentWritten('users/{userId}', async (event) => {
+  const before = event.data.before.data();
+  const after  = event.data.after.data();
+  if (before.name === after.name) return null;
+  await event.data.after.ref.update({ nameLower: after.name.toLowerCase() });
+});
+```
+
+Covers v2 (`onDocumentWritten`/`onDocumentUpdated`, `onValueWritten`/`onValueUpdated`) and the v1 chained syntax (`functions.firestore.document(...).onWrite(...)`).
+
+Two deliberate limits keep false positives down: **`onCreate`/`onDelete` triggers are never flagged**, because a write-back from those emits a *different* event type and terminates; and a handler that references `before` is treated as guarded, since a before/after comparison is the standard way to break the cycle.
+
 ---
 
 ## Suppressing a violation
@@ -383,6 +405,7 @@ Each violation carries a point weight based on its real-world cost impact. Score
 | FCG016 Unexported Cloud Function | Cost + Scalability | 10 |
 | FCG017 Cloud Function in loop | Cost + Scalability | 25 |
 | FCG018 Missing useEffect deps array | Cost + Scalability | 30 |
+| FCG019 Trigger writes to its own document | Cost + Scalability | 40 |
 
 **Risk levels per category**
 

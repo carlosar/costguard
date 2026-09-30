@@ -19,6 +19,7 @@ import { fieldValueAtomicRule } from './rules/fieldvalue-atomic';
 import { unusedCloudFunctionRule } from './rules/unused-cloud-function';
 import { cloudfunctionInLoopRule } from './rules/cloudfunction-in-loop';
 import { missingDepsArrayRule } from './rules/missing-deps-array';
+import { triggerSelfWriteRule } from './rules/trigger-self-write';
 
 const ALL_RULES = [
   unstableDepsRule,           // FCG001: unstable useEffect deps (object/array/fn/call)
@@ -39,6 +40,7 @@ const ALL_RULES = [
   unusedCloudFunctionRule,    // FCG016: Cloud Function defined but not exported (dead in bundle)
   cloudfunctionInLoopRule,    // FCG017: httpsCallable invoked in a loop (N billed executions)
   missingDepsArrayRule,       // FCG018: useEffect with no deps array + expensive op
+  triggerSelfWriteRule,       // FCG019: trigger writes back to its own document (infinite loop)
 ];
 
 export function analyzeFile(sourceText: string, filePath: string): RuleDiagnostic[] {
