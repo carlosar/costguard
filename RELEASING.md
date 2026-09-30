@@ -83,11 +83,28 @@ Set at `Settings → Secrets and variables → Actions`:
 
 | Secret | Used for | Expires |
 |---|---|---|
-| `NPM_TOKEN` | publishing the CLI to npm | per npm settings |
 | `VSCE_PAT` | publishing the extension to the Marketplace | **yes — see below** |
 | `GITHUB_TOKEN` | tag, release, changelog commit | automatic, never expires |
+| `NPM_TOKEN` | *no longer used* — npm publishes via OIDC | n/a |
 
 `GITHUB_TOKEN` is provided by Actions; you never create it.
+
+**npm uses trusted publishing (OIDC), not a token.** The workflow requests
+`id-token: write` and semantic-release exchanges a short-lived GitHub OIDC token
+for npm credentials at publish time. Nothing is stored and nothing expires. The
+package must have a trusted publisher configured at
+<https://www.npmjs.com/package/costguard/access>:
+
+| Field | Value |
+|---|---|
+| Organization or user | `carlosar` |
+| Repository | `costguard` |
+| Workflow filename | `release.yml` |
+| Environment | *(blank)* |
+
+The workflow filename must match exactly — npm validates it against the OIDC
+claim. If the trusted publisher is missing, semantic-release falls back to
+`NPM_TOKEN` and fails with `EINVALIDNPMTOKEN` when that is absent or expired.
 
 ---
 
@@ -214,6 +231,15 @@ The check now fails the job before anything is published, so a bad token costs a
 red build instead of a broken release.
 
 ---
+
+## Deadline: npm 2FA-bypass tokens lose publishing ~2027-01
+
+Per [npm's changelog](https://github.blog/changelog/2026-07-08-npm-install-time-security-and-gat-bypass2fa-deprecation/),
+2FA-bypass granular access tokens already lost account and package management in
+August 2026 and lose **publishing** around January 2027. A replacement token is
+therefore a dead end; trusted publishing (configured above) is the path that
+survives. This repo is already on it, and `NPM_TOKEN` can be deleted once a
+release has published successfully via OIDC.
 
 ## Deadline: global PATs retire 2026-12-01
 

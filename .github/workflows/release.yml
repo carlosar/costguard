@@ -13,6 +13,11 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
+      # Lets semantic-release publish to npm via OIDC trusted publishing
+      # (short-lived credentials, nothing stored, nothing to expire) instead of
+      # a long-lived NPM_TOKEN. Requires a trusted publisher configured for this
+      # package on npmjs.com; it falls back to NPM_TOKEN if that is absent.
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
@@ -23,6 +28,11 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
+
+      # Node 22 bundles npm 10.x; OIDC trusted publishing needs 11.5.1+.
+      # Cheap insurance against a failed release cycle.
+      - name: Use an npm that supports trusted publishing
+        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: npm ci
