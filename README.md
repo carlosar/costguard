@@ -428,6 +428,19 @@ db.collection('orders').orderBy('createdAt').startAfter(lastDoc).limit(20);
 
 `offset()` is normal and cheap in SQL query builders like Knex, so this fires only when the chain to the left of `.offset()` contains a Firestore collection accessor.
 
+### FCG024 — `minInstances` bills idle instances `warning`
+`minInstances` keeps instances warm so requests skip the cold start — and bills their CPU and memory the whole time they sit idle. It accrues at 3am with zero traffic, scales with both instance count and memory, and usually shows up as an unexplained *"Idle Min-Instance CPU Allocation Time"* line on the invoice.
+
+```ts
+// Warned — 5 instances billed around the clock, at 2GiB each
+export const api = onRequest({ minInstances: 5, memory: '2GiB' }, handler); // ← FCG024
+
+// setGlobalOptions is worse: this applies to EVERY function you deploy
+setGlobalOptions({ minInstances: 1 });                                      // ← FCG024
+```
+
+This is a legitimate setting rather than a bug, so it's a warning — the point is to surface the standing cost when it's introduced (usually by copy-paste) instead of on the bill. `minInstances: 0` is the free default and is never flagged, and a variable value is left alone since it can't be evaluated statically.
+
 ---
 
 ## Suppressing a violation
@@ -476,6 +489,7 @@ Each violation carries a point weight based on its real-world cost impact. Score
 | FCG021 Unbounded Realtime Database read | Cost + Scalability | 18 |
 | FCG022 RTDB listener without cleanup | Memory Leak | 20 |
 | FCG023 offset() pagination | Cost + Scalability | 16 |
+| FCG024 minInstances idle billing | Cost | 12 |
 
 **Risk levels per category**
 

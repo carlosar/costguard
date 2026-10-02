@@ -24,6 +24,7 @@ import { clientSideAiKeyRule } from './rules/client-side-ai-key';
 import { rtdbUnboundedReadRule } from './rules/rtdb-unbounded-read';
 import { rtdbListenerCleanupRule } from './rules/rtdb-listener-cleanup';
 import { offsetPaginationRule } from './rules/offset-pagination';
+import { minInstancesIdleRule } from './rules/min-instances-idle';
 
 const ALL_RULES = [
   unstableDepsRule,           // FCG001: unstable useEffect deps (object/array/fn/call)
@@ -49,6 +50,7 @@ const ALL_RULES = [
   rtdbUnboundedReadRule,      // FCG021: RTDB read with no limit / at the root
   rtdbListenerCleanupRule,    // FCG022: RTDB listener without cleanup
   offsetPaginationRule,       // FCG023: offset() pagination bills every skipped doc
+  minInstancesIdleRule,       // FCG024: minInstances bills idle CPU/memory 24/7
 ];
 
 export function analyzeFile(sourceText: string, filePath: string): RuleDiagnostic[] {
