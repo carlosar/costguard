@@ -25,6 +25,7 @@ import { rtdbUnboundedReadRule } from './rules/rtdb-unbounded-read';
 import { rtdbListenerCleanupRule } from './rules/rtdb-listener-cleanup';
 import { offsetPaginationRule } from './rules/offset-pagination';
 import { minInstancesIdleRule } from './rules/min-instances-idle';
+import { openSecurityRulesRule } from './rules/open-security-rules';
 
 const ALL_RULES = [
   unstableDepsRule,           // FCG001: unstable useEffect deps (object/array/fn/call)
@@ -53,7 +54,25 @@ const ALL_RULES = [
   minInstancesIdleRule,       // FCG024: minInstances bills idle CPU/memory 24/7
 ];
 
+// Security rules are their own language, not JavaScript — handing them to
+// ts-morph would produce garbage. They get a separate, text-based rule set.
+const RULES_FILE_RULES = [
+  openSecurityRulesRule,      // FCG025: allow ... : if true / test-mode date gate
+];
+
 export function analyzeFile(sourceText: string, filePath: string): RuleDiagnostic[] {
+  if (/\.rules$/.test(filePath)) {
+    const results: RuleDiagnostic[] = [];
+    for (const rule of RULES_FILE_RULES) {
+      try {
+        results.push(...rule.analyze(sourceText, filePath));
+      } catch {
+        // Never let a rule crash the extension
+      }
+    }
+    return applySuppressions(sourceText, results);
+  }
+
   const project = new Project({
     useInMemoryFileSystem: true,
     skipFileDependencyResolution: true,

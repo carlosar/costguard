@@ -10,11 +10,22 @@ import { generateReport } from './reporter';
 import { initTelemetry, trackEvent, disposeTelemetry } from './telemetry';
 
 const SUPPORTED = new Set(['typescript', 'typescriptreact', 'javascript', 'javascriptreact']);
+
+/**
+ * Security rules are analysed too, but `.rules` has no built-in language id —
+ * it opens as plaintext unless the Firebase extension is installed — so it is
+ * matched on the file name instead.
+ */
+function isSupportedDoc(doc: vscode.TextDocument): boolean {
+  return SUPPORTED.has(doc.languageId) || doc.fileName.endsWith('.rules');
+}
+
 const SUPPORTED_SELECTOR = [
   { language: 'typescript' },
   { language: 'typescriptreact' },
   { language: 'javascript' },
   { language: 'javascriptreact' },
+  { pattern: '**/*.rules' },
 ];
 
 let diagnosticCollection: vscode.DiagnosticCollection;
@@ -124,7 +135,7 @@ function highestLevel(score: RiskScore): RiskLevel {
 
 function analyzeDoc(doc: vscode.TextDocument, source?: 'open' | 'save'): void {
   if (doc.uri.scheme !== 'file') return;
-  if (!SUPPORTED.has(doc.languageId)) return;
+  if (!isSupportedDoc(doc)) return;
 
   const enabled = vscode.workspace.getConfiguration('costGuard').get<boolean>('enable', true);
   if (!enabled) {
@@ -174,7 +185,7 @@ function analyzeDoc(doc: vscode.TextDocument, source?: 'open' | 'save'): void {
 // ── Status bar ────────────────────────────────────────────────────────────────
 
 function updateStatusBar(doc: vscode.TextDocument | undefined): void {
-  if (!doc || !SUPPORTED.has(doc.languageId)) { statusBarItem.hide(); return; }
+  if (!doc || !isSupportedDoc(doc)) { statusBarItem.hide(); return; }
 
   const score = riskCache.get(doc.uri.toString());
   if (!score) { statusBarItem.hide(); return; }
@@ -378,7 +389,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.workspace.onDidSaveTextDocument(doc  => analyzeDoc(doc, 'save')),
     vscode.workspace.onDidChangeTextDocument(event => {
       const doc = event.document;
-      if (!SUPPORTED.has(doc.languageId)) return;
+      if (!isSupportedDoc(doc)) return;
       const key = doc.uri.toString();
       const existing = debounceMap.get(key);
       if (existing) clearTimeout(existing);

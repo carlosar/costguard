@@ -35,7 +35,9 @@ export function detectIndent(raw: string): number | string {
   return m[1].startsWith('\t') ? '\t' : m[1].length;
 }
 
-export const FIREBASE_PREDEPLOY_CMD = 'npx costguard src/ --max-risk=MEDIUM';
+// Security rules live at the project root, outside src/, so they are named
+// explicitly. A path that does not exist simply contributes no files.
+export const FIREBASE_PREDEPLOY_CMD = 'npx costguard src/ firestore.rules storage.rules --max-risk=MEDIUM';
 
 // Deploy targets whose firebase.json entries support predeploy hooks
 const FIREBASE_PREDEPLOY_TARGETS = ['hosting', 'functions', 'firestore', 'storage', 'database'];

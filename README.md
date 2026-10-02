@@ -441,6 +441,28 @@ setGlobalOptions({ minInstances: 1 });                                      // �
 
 This is a legitimate setting rather than a bug, so it's a warning — the point is to surface the standing cost when it's introduced (usually by copy-paste) instead of on the bill. `minInstances: 0` is the free default and is never flagged, and a variable value is left alone since it can't be evaluated statically.
 
+### FCG025 — Security rules grant public access `error`
+`allow read, write: if true` lets anyone on the internet read and write your database. It's a security problem first, but it's also the fastest route to a runaway bill: every scraped document is a billed read, and [security rules cannot rate-limit requests](https://firebase.google.com/docs/rules/basics), so an open ruleset is an open tab.
+
+```
+// Bad — anyone, no sign-in
+match /{document=**} {
+  allow read, write: if true;              // ← FCG025
+}
+
+// Bad — Firebase's generated test-mode rules: public until the date, broken after
+allow read, write: if request.time < timestamp.date(2027, 1, 15);  // ← FCG025
+
+// Fix
+match /users/{userId} {
+  allow read, write: if request.auth != null && request.auth.uid == userId;
+}
+```
+
+**This scans `.rules` files**, which aren't JavaScript — they get a separate text-based analysis path rather than the AST used by every other rule. `if false`, auth checks, role lookups via `get()`, and ordinary `request.time` comparisons are all left alone, and commented-out rules don't fire.
+
+Because rules live at the project root rather than in `src/`, the setup wizard now writes gates that name them explicitly (`npx costguard src/ firestore.rules storage.rules`). A path that doesn't exist simply contributes no files. **If you set up CostGuard before v0.9.0, add those filenames to your existing `predeploy` scripts and workflow** — otherwise the gates will never see your rules.
+
 ---
 
 ## Suppressing a violation
@@ -490,6 +512,7 @@ Each violation carries a point weight based on its real-world cost impact. Score
 | FCG022 RTDB listener without cleanup | Memory Leak | 20 |
 | FCG023 offset() pagination | Cost + Scalability | 16 |
 | FCG024 minInstances idle billing | Cost | 12 |
+| FCG025 Security rules grant public access | Cost + Scalability | 35 |
 
 **Risk levels per category**
 

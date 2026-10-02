@@ -29,7 +29,7 @@ jobs:
         run: npm ci
 
       - name: Run CostGuard
-        run: npx costguard src/ --json > costguard-report.json || true
+        run: npx costguard src/ firestore.rules storage.rules --json > costguard-report.json || true
 
       - name: Post PR comment
         uses: actions/github-script@v7

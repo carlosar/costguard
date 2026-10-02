@@ -6,7 +6,7 @@ import { analyzeFile } from './analyzer';
 import { computeRiskScore } from './analyzer/scorer';
 import { RiskScore, RiskLevel } from './analyzer/types';
 
-const SUPPORTED_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx']);
+const SUPPORTED_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.rules']);
 const SKIP_DIRS      = new Set(['node_modules', 'out', 'dist', 'build', '.git', '.next', 'coverage']);
 const RISK_ORDER: Record<RiskLevel, number> = { LOW: 0, MEDIUM: 1, HIGH: 2 };
 

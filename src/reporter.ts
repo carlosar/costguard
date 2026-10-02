@@ -6,7 +6,7 @@ import { RiskScore, RuleDiagnostic } from './analyzer/types';
 
 // ── File collection ───────────────────────────────────────────────────────────
 
-const SUPPORTED_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx']);
+const SUPPORTED_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.rules']);
 const SKIP_DIRS      = new Set(['node_modules', 'out', 'dist', 'build', '.git', '.next', 'coverage', 'costguard']);
 
 function collectFiles(dir: string): string[] {
