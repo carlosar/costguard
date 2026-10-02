@@ -415,6 +415,19 @@ useEffect(() => {
 
 Recognises both the modular unsubscribe and the compat `ref.off('value', cb)` form. FCG004 only knows Firestore's `onSnapshot`, so before this rule the entire RTDB surface leaked silently; they're separate codes so you can suppress them independently. The `.on(...)` check is keyed to RTDB event names, so an `EventEmitter` or socket is never mistaken for a database listener.
 
+### FCG023 — Firestore pagination with `offset()` `warning`
+Firestore charges for every document an offset skips, not just the ones returned. `offset(1000).limit(20)` bills **1020 reads to show 20 rows**, and the cost grows with the page number — page 50 costs 50× page 1. Firebase's [best practices](https://firebase.google.com/docs/firestore/best-practices) are blunt: "Do not use offsets."
+
+```ts
+// Bad — page N costs N*20 extra reads
+db.collection('orders').orderBy('createdAt').offset(n * 20).limit(20); // ← FCG023
+
+// Fix — a cursor bills only what you receive
+db.collection('orders').orderBy('createdAt').startAfter(lastDoc).limit(20);
+```
+
+`offset()` is normal and cheap in SQL query builders like Knex, so this fires only when the chain to the left of `.offset()` contains a Firestore collection accessor.
+
 ---
 
 ## Suppressing a violation
@@ -462,6 +475,7 @@ Each violation carries a point weight based on its real-world cost impact. Score
 | FCG020 Gemini API key in client code | Cost | 35 |
 | FCG021 Unbounded Realtime Database read | Cost + Scalability | 18 |
 | FCG022 RTDB listener without cleanup | Memory Leak | 20 |
+| FCG023 offset() pagination | Cost + Scalability | 16 |
 
 **Risk levels per category**
 

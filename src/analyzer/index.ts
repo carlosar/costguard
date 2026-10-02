@@ -23,6 +23,7 @@ import { triggerSelfWriteRule } from './rules/trigger-self-write';
 import { clientSideAiKeyRule } from './rules/client-side-ai-key';
 import { rtdbUnboundedReadRule } from './rules/rtdb-unbounded-read';
 import { rtdbListenerCleanupRule } from './rules/rtdb-listener-cleanup';
+import { offsetPaginationRule } from './rules/offset-pagination';
 
 const ALL_RULES = [
   unstableDepsRule,           // FCG001: unstable useEffect deps (object/array/fn/call)
@@ -47,6 +48,7 @@ const ALL_RULES = [
   clientSideAiKeyRule,        // FCG020: Gemini API key reachable from the browser
   rtdbUnboundedReadRule,      // FCG021: RTDB read with no limit / at the root
   rtdbListenerCleanupRule,    // FCG022: RTDB listener without cleanup
+  offsetPaginationRule,       // FCG023: offset() pagination bills every skipped doc
 ];
 
 export function analyzeFile(sourceText: string, filePath: string): RuleDiagnostic[] {
