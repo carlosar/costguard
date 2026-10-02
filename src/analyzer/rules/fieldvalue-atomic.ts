@@ -29,6 +29,17 @@ const WRITE_CALLS = new Set(['setDoc', 'updateDoc', 'addDoc']);
 // Already using atomic operations — skip
 const ALREADY_ATOMIC_RE = /\b(arrayUnion|arrayRemove|increment|serverTimestamp|deleteField)\s*\(/;
 
+const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Whole-identifier match. A plain substring test is unsafe here: a mutated
+ * counter named `i` "appears" inside words like `items` or `name`, which would
+ * tie an unrelated write to it and report a loop counter as a Firestore field.
+ */
+function mentions(haystack: string, name: string): boolean {
+  return new RegExp(`\\b${escapeRe(name)}\\b`).test(haystack);
+}
+
 export const fieldValueAtomicRule: Rule = {
   id: 'FCG015',
 
@@ -36,7 +47,11 @@ export const fieldValueAtomicRule: Rule = {
     // Fast exit: needs both a doc read and a mutation pattern
     const hasRead = sourceText.includes('getDoc') || sourceText.includes('.data()');
     const hasArrayMutation = sourceText.includes('.push(') || sourceText.includes('.concat(') || sourceText.includes('.splice(');
-    const hasCounterMutation = /\+= *1\b/.test(sourceText) || /\+\+/.test(sourceText) || /--/.test(sourceText);
+    // Counter work takes two shapes: an in-place operator (count += 1, count++)
+    // or arithmetic written straight into the update ({ count: data.count + 1 }).
+    // Only the first was recognised here, which made the second — the form this
+    // rule's own docs use as the example — impossible to report.
+    const hasCounterMutation = /\+\+|--|\+=|-=|[\w.]+\s*[+-]\s*1\b/.test(sourceText);
     if (!hasRead || (!hasArrayMutation && !hasCounterMutation)) return [];
 
     let sf: SourceFile;
@@ -92,7 +107,7 @@ export const fieldValueAtomicRule: Rule = {
         // Require write args to reference the same variable that was mutated — prevents
         // false positives where push() is on a local/helper array unrelated to the write
         const mutatedVars = [...scopeText.matchAll(/\b(\w+)\.(?:push|concat|splice)\s*\(/g)].map(m => m[1]);
-        if (!mutatedVars.some(v => argText.includes(v))) return;
+        if (!mutatedVars.some(v => mentions(argText, v))) return;
 
         const pos = call.getExpression().getStart();
         const { line, column } = sf.getLineAndColumnAtPos(pos);
@@ -109,15 +124,18 @@ export const fieldValueAtomicRule: Rule = {
       }
 
       // Pattern B — counter mutation
-      if (
-        (/\+= *1\b/.test(scopeText) || /\+\+/.test(scopeText) || /--/.test(scopeText)) &&
-        scopeText.includes('.data()')
-      ) {
+      if (scopeText.includes('.data()')) {
         const argText = call.getArguments().map(a => a.getText()).join(', ');
         if (ALREADY_ATOMIC_RE.test(argText)) return;
-        // Require write args to contain an incremented/decremented expression — prevents
-        // false positives where ++ is on a local counter unrelated to the Firestore write
-        if (!/\b\w+\s*[+\-]\s*1\b|\b\w+(?:\+\+|--)/.test(argText)) return;
+
+        // Either the arithmetic is in the write itself ({ count: data.count + 1 }),
+        // or a counter was mutated in place and that same value is written back
+        // (data.count += 1 … { count: data.count }). Tying the write args to the
+        // mutated variable keeps an unrelated local counter from triggering this.
+        const mutatedCounters = [...scopeText.matchAll(/\b([\w.]+)\s*(?:\+\+|--|\+=|-=)/g)].map(m => m[1]);
+        const argHasArithmetic = /[\w.]+\s*[+-]\s*1\b|[\w.]+(?:\+\+|--)/.test(argText);
+        const argRefsMutatedCounter = mutatedCounters.some(v => mentions(argText, v));
+        if (!argHasArithmetic && !argRefsMutatedCounter) return;
 
         const pos = call.getExpression().getStart();
         const { line, column } = sf.getLineAndColumnAtPos(pos);
