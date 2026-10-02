@@ -1,3 +1,17 @@
+# [0.9.0](https://github.com/carlosar/costguard/compare/v0.8.0...v0.9.0) (2026-10-02)
+
+
+### Bug Fixes
+
+* **fcg015:** counter detection never fired on the pattern it documents ([53437c3](https://github.com/carlosar/costguard/commit/53437c3fa0af4eefc626e3e03fbe61ca6d5ac549))
+
+
+### Features
+
+* add FCG023 — Firestore pagination with offset() ([bfa921d](https://github.com/carlosar/costguard/commit/bfa921da48ffaf46b84f23cffdbf663ba56519f5))
+* add FCG024 — minInstances bills idle Cloud Function instances ([d144152](https://github.com/carlosar/costguard/commit/d144152c8f83c55c9d743bfa5d7a0d76b08d30a7))
+* analyse security rules; add FCG025 for publicly-open rulesets ([2d93a6e](https://github.com/carlosar/costguard/commit/2d93a6e075317d1d150ba6a4e56c3e6594f08bfa))
+
 # [0.8.0](https://github.com/carlosar/costguard/compare/v0.7.0...v0.8.0) (2026-09-30)
 
 
