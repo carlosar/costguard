@@ -7,13 +7,23 @@
 
 Catch expensive Firebase and React patterns before they hit production — and before they hit your bill.
 
-CostGuard is a VS Code extension that detects runaway Firestore reads, missing listener cleanup, render loops, and other cost-heavy patterns as you write code. It adds inline squiggles, a per-file risk score, and optional gates that block bad code from being committed, merged, or deployed.
+CostGuard is a VS Code extension and CLI that detects the code patterns behind surprise Firebase bills: unbounded Firestore and Realtime Database reads, listeners that never clean up, React render loops, Cloud Function trigger loops, API keys exposed to the browser, and open security rules. It adds inline squiggles, a per-file risk score, and optional gates that block bad code from being committed, merged, or deployed.
 
 **[Install from the VS Code Marketplace →](https://marketplace.visualstudio.com/items?itemName=soarone.costguard)**
 
 ---
 
 ## What it catches
+
+**25 rules**, each explained with a bad/fix example under [What it detects](#what-it-detects):
+
+| Area | Rules |
+|---|---|
+| Firestore reads and writes | FCG002 unbounded read · FCG005 read in loop · FCG012 unbatched writes · FCG013 polling · FCG014 client-side filter · FCG015 read-modify-write · FCG023 `offset()` pagination |
+| React effects and handlers | FCG001 unstable deps · FCG003 listener on UI state · FCG009 read in render · FCG010 compound render loop · FCG011 high-frequency handler · FCG018 missing deps array |
+| Missing cleanup | FCG004 `onSnapshot` · FCG006 `setInterval` · FCG007 `addEventListener` · FCG022 Realtime Database listener |
+| Cloud Functions | FCG016 unexported function · FCG017 callable in a loop · FCG019 trigger writes to its own document · FCG024 idle `minInstances` |
+| Other billed surfaces | FCG021 unbounded Realtime Database read · FCG020 Gemini key in client code · FCG025 open security rules · FCG008 fetch/axios in a loop |
 
 **Example: one unbounded read can quietly cost ~$90/month**
 
