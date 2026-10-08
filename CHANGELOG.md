@@ -1,3 +1,10 @@
+## [0.9.1](https://github.com/carlosar/costguard/compare/v0.9.0...v0.9.1) (2026-10-08)
+
+
+### Bug Fixes
+
+* describe all 25 rules in the listing summary and add search keywords ([4e964dd](https://github.com/carlosar/costguard/commit/4e964dd85721bc4995e899613c75a51a90abfdc5))
+
 # [0.9.0](https://github.com/carlosar/costguard/compare/v0.8.0...v0.9.0) (2026-10-02)
 
 

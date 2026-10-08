@@ -2,7 +2,7 @@
   "name": "costguard",
   "displayName": "CostGuard",
   "description": "Catches Firebase cost traps before they ship: unbounded Firestore and Realtime Database reads, listener leaks, React render loops, Cloud Function trigger loops, exposed Gemini keys and open security rules.",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "publisher": "soarone",
   "engines": {
     "vscode": "^1.85.0"
